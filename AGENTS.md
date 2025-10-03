@@ -37,7 +37,7 @@ graph TB
 ## Key Rules & Constraints
 - Container sleeps after 20 minutes of inactivity (configurable in MinecraftContainer)
 - RCON password is hardcoded as "minecraft" (safe on private tailnet)
-- Containers expose ports: 8080 (health checks), 8081 (server port), 25565 (Minecraft game traffic), 25575 (RCON console)
+- Containers expose ports: 8080 (health checks), 8081 (Minecraft game traffic), 25575 (RCON console)
 - Requires TS_AUTHKEY environment variable for Tailscale authentication
 - Uses userspace networking mode for container compatibility
 - EULA automatically accepted for Minecraft server
