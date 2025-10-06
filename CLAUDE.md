@@ -23,7 +23,7 @@ Mineflare is a Cloudflare-based Minecraft server hosting platform that uses Clou
 - `bun run version` - Show Alchemy version
 
 ### Container
-- `./container_src/build-proxy.sh` - Build the HTTP proxy binary for the container (automatically run by dev script)
+- `./container_src/build-container-services.sh` - Build the HTTP proxy binary and File server binary for the container (automatically run by dev script)
 
 ## Architecture
 
@@ -71,8 +71,8 @@ src/
 container_src/
 ├── Dockerfile           # Multi-stage build: http-proxy + itzg/minecraft-server
 ├── http-proxy.ts        # TypeScript source for HTTP proxy (Bun-based)
-├── http-proxy           # Compiled binary (built by build-proxy.sh)
-├── build-proxy.sh       # Build script for http-proxy binary
+├── http-proxy           # Compiled binary (built by build-container-services.sh)
+├── build-container-services.sh       # Build script for http-proxy binary
 ├── start-with-services.sh  # Container entrypoint (starts proxy, Minecraft, plugins)
 └── *.jar                # Plugin files (Dynmap, playit.gg)
 
@@ -219,7 +219,7 @@ alchemy.run.ts           # Alchemy infrastructure config (workers, containers, R
 
 ### Container Development
 - Container changes require rebuilding Docker image
-- HTTP proxy must be rebuilt when http-proxy.ts changes: `./container_src/build-proxy.sh`
+- HTTP proxy must be rebuilt when http-proxy.ts changes: `./container_src/build-container-services.sh`
 - Dev mode: `bun run dev` rebuilds proxy and starts Alchemy dev server
 - Container logs available at `/api/logs` endpoint (only when container is running)
 
