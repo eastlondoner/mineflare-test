@@ -82,11 +82,11 @@ alchemy.run.ts           # Alchemy infrastructure config (workers, containers, R
 ### Authentication System
 
 **Cookie-Based Auth with Encrypted Tokens**
-- First-time setup: POST `/api/auth/setup` creates password hash (PBKDF2) and symmetric key (AES-GCM)
-- Login: POST `/api/auth/login` verifies password and returns encrypted session cookie (7-day expiry)
+- First-time setup: POST `/auth/setup` creates password hash (PBKDF2) and symmetric key (AES-GCM)
+- Login: POST `/auth/login` verifies password and returns encrypted session cookie (7-day expiry)
 - Auth data stored in Durable Object SQL (salt, password_hash, sym_key)
 - Middleware `requireAuth()` validates cookie on every request
-- WebSocket tokens: Short-lived (20 min) tokens generated via `/api/auth/ws-token` for terminal connections
+- WebSocket tokens: Short-lived (20 min) tokens generated via `/auth/ws-token` for terminal connections
 - Cache layer: Worker cache stores passwordSet status and symmetric key to avoid DO wakeup on every request
 
 **Important Auth Notes**
@@ -223,6 +223,49 @@ alchemy.run.ts           # Alchemy infrastructure config (workers, containers, R
 - Dev mode: `bun run dev` rebuilds proxy and starts Alchemy dev server
 - Container logs available at `/api/logs` endpoint (only when container is running)
 
+### Paper Plugin Dev Environment (`container_src/setup-paper-dev.sh`)
+- Purpose: Set up a container-friendly Paper plugin development toolchain.
+- Run as root (or with sudo):
+
+```bash
+./container_src/setup-paper-dev.sh [--with-maven] [--minimal]
+```
+
+- Flags:
+  - `--with-maven`: Also install Maven.
+  - `--minimal`: Skip Maven even if `--with-maven` is provided.
+
+- Installs:
+  - OpenJDK 21 (full JDK)
+  - Gradle (latest via SDKMAN)
+  - CLI/tools: git, curl, wget, ca-certificates, gnupg, unzip, zip, tar, rsync, jq, build-essential, pkg-config, libstdc++6, coreutils, findutils, sed, gawk, time, tree, net-tools, vim, nano
+  - Optional: Maven (only with `--with-maven` and not `--minimal`)
+
+- Environment setup:
+  - Exports `JAVA_HOME` and updates `PATH` via `/etc/profile.d/java21.sh` (auto-detected from `javac`).
+  - Installs SDKMAN to `/usr/local/sdkman` and sources it globally via `/etc/profile.d/sdkman.sh`.
+  - Gradle installed via SDKMAN; OpenJDK 21 used as the Java runtime.
+
+- System tuning:
+  - Adds `/etc/sysctl.d/60-inotify.conf` with:
+    - `fs.inotify.max_user_watches=524288`
+    - `fs.inotify.max_user_instances=1024`
+  - Applies settings best-effort with `sysctl --system` (safe in containers).
+
+- Verify installation:
+
+```bash
+java -version
+javac -version
+gradle -v
+# If installed:
+mvn -v
+```
+
+- Notes:
+  - Idempotent apt installs; cleans apt cache to keep images small.
+  - Designed for container environments (no systemd; no Docker-in-Docker requirements).
+
 ### Environment Variables
 - `TS_AUTHKEY` - Tailscale authentication key (optional, enables VPN)
 - `NODE_ENV` - "development" or "production"
@@ -240,7 +283,7 @@ alchemy.run.ts           # Alchemy infrastructure config (workers, containers, R
 
 ### Common Pitfalls
 - Container must be running for most API endpoints to work (except `/api/getState`, `/api/plugins`)
-- WebSocket endpoint requires special token from `/api/auth/ws-token`
+- WebSocket endpoint requires special token from `/auth/ws-token`
 - Plugin env changes require server to be stopped
 - HTTP proxy connection failures are normal during container startup (retries automatically)
 - RCON connection is lazy-initialized on first use (may fail if server not ready)
