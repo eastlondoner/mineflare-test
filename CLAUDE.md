@@ -49,7 +49,7 @@ Mineflare is a Cloudflare-based Minecraft server hosting platform that combines 
    - 8082 – log tail (hteetp)
    - 8083 – file server + backup/restore API
    - 8084 – HTTP proxy control channel
-   - 8085-8109 – HTTP proxy data channels for R2 access (25 channels)
+   - 8085-8100 – HTTP proxy data channels for R2 access (16 channels)
    - 7681-7684 – ttyd terminals (Claude, Codex, Gemini, Bash)
    - 5900 – x11vnc VNC server
    - 6080 – websockify (VNC-to-WebSocket proxy)
@@ -147,7 +147,7 @@ alchemy.run.ts                # Alchemy IaC definition for workers, containers, 
 ## HTTP Proxy & Helper Services
 
 - Control channel on port 8084 maintains a persistent JSON RPC loop to allocate/deallocate data channels.
-- Data channels on ports 8085-8109 proxy HTTP requests/responses to `fetchFromR2()` inside the Durable Object.
+- Data channels on ports 8085-8100 proxy HTTP requests/responses to `fetchFromR2()` inside the Durable Object.
 - File server on port 8083 exposes `/data` for reads and accepts backup jobs via `?backup=true&backup_id=...`; progress is polled from `/backup-status?id=...`.
 - Log tail on port 8082 streams the latest 1 MB of Minecraft logs.
 - Proxy supports chunked encoding, conditional requests (`If-Match`, `If-None-Match`), multipart uploads, and bucket prefix handling for both Dynmap and private data.
