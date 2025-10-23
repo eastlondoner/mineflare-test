@@ -30,7 +30,8 @@ Mineflare is a Cloudflare-based Minecraft server hosting platform that combines 
 - `bun run version` - Output the current Alchemy CLI version.
 
 ### Container
-- `./container_src/build-container-services.sh` - Manually rebuild the Bun-based HTTP proxy and file-server binaries (normally invoked by `bun run dev`).
+- `./docker_src/build-container-services.sh` - Manually rebuild the Bun-based HTTP proxy and file-server binaries (normally invoked by `bun run dev`).
+- `bun ./docker_src/build.ts` - Build a single multi-version container image that includes all supported Paper versions (1.21.7, 1.21.8, 1.21.10) with architecture-specific binaries for amd64 and arm64. Uses Docker buildx for multi-platform builds and caches results to `.BASE_DOCKERFILE`.
 
 ## Architecture
 
@@ -233,6 +234,38 @@ alchemy.run.ts                # Alchemy IaC definition for workers, containers, 
 - `sleepAfter = "20m"`; once idle the container sleeps automatically.
 - `/api/status` is the canonical wake-up path; other endpoints that call into the container expect it to be running and will return errors if it is stopped.
 
+## Single Container, Multiple Paper Versions
+
+**Rationale**
+- All supported Paper Minecraft builds (1.21.7, 1.21.8, 1.21.10) are bundled in a single container image to avoid the complexity of managing multiple Cloudflare Container resources and binding swaps.
+- This approach preserves Durable Object state (authentication, plugins, sessions) across version changes and eliminates cold starts when switching versions.
+- Users can switch between versions instantly via the UI selector without losing their server configuration.
+
+**Supported Versions**
+- `1.21.7` - Legacy (older stable release)
+- `1.21.8` - Stable (recommended for most users)
+- `1.21.10` - Experimental (latest features, may have stability issues)
+
+**How It Works**
+- The selected version is stored in the Durable Object's SQLite `state.json_data.serverVersion` field (default: "1.21.8").
+- When the container starts, `MinecraftContainer.start()` reads the stored version and sets `envVars.VERSION` before launching the Minecraft process.
+- The `itzg/minecraft-server` base image honors the `VERSION` environment variable and loads the appropriate Paper build from `/opt/minecraft/server/<VERSION>`.
+- Version-specific plugins (e.g., Dynmap) are symlinked by `start-with-services.sh` based on the `VERSION` environment variable.
+
+**API Endpoints**
+- `GET /api/version` - Returns current version, label (legacy/stable/experimental), supported versions, and whether changes are allowed (only when stopped).
+- `POST /api/version` - Updates the server version; rejects requests with 409 if the server is running or 400 if the version is unsupported.
+
+**UI Integration**
+- The `VersionSelector` component displays three option cards (Legacy/Stable/Experimental) with visual indicators for the current selection.
+- Version changes are only permitted when `serverState === 'stopped'`; the UI disables interaction and shows tooltips otherwise.
+- Warnings inform users about world compatibility and backup recommendations when switching versions.
+
+**Important Notes**
+- Changing versions does not automatically restart the server; users must manually start after switching.
+- World compatibility is the user's responsibility; downgrades may not be fully supported.
+- Version-specific plugins (like Dynmap) are automatically selected based on the active version.
+
 ## R2 Bucket Integration
 
 **Dynmap Storage**
@@ -273,8 +306,15 @@ alchemy.run.ts                # Alchemy IaC definition for workers, containers, 
 - Development state store uses SQLite; production uses `CloudflareStateStore` with encrypted state.
 
 ### Container Development
-- Any change to `http-proxy.ts`, file server, or ttyd helpers requires rerunning `./container_src/build-container-services.sh` (or `bun run dev`).
+- Any change to `http-proxy.ts`, file server, or ttyd helpers requires rerunning `./docker_src/build-container-services.sh` (or `bun run dev`).
 - Container image is built from the `docker_src` assets with architecture-specific binaries checked into the repo.
+- Multi-version build process (`docker_src/build.ts`):
+  - Builds a single container image containing all three Paper versions (1.21.7, 1.21.8, 1.21.10)
+  - Multi-platform support for both amd64 and arm64 architectures
+  - The Dockerfile installs all Paper server JARs and version-specific Dynmap plugins during the build stage
+  - Uses Docker buildx with registry caching to minimize rebuild times
+  - Image tag is written to `.BASE_DOCKERFILE` for Alchemy to consume
+  - Runtime version selection is handled via `VERSION` environment variable
 - Container logs are accessible via `/api/logs` only when the container is running; expect errors if the container is asleep.
 
 ### Environment Variables & Bindings
