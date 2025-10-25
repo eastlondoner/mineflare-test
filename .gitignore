@@ -183,3 +183,4 @@ lerna-debug.log*
 docker_src/.BUILD_CONTAINER_SERVICES
 docker_src/chrome-*
 docker_src/mineflare-*
+docker_src/chromium-*

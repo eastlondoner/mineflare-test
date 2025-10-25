@@ -120,8 +120,6 @@ RUN set -eux; \
     chmod -R 755 /opt/chrome; \
     rm -rf /tmp/*
 
-COPY CLAUDE.md /data/CLAUDE.md
-
 # Fetch latest mineflare-cli README and place in /docs for AI agent reference
 RUN mkdir -p /docs/mineflare-cli \
     && curl -fsSL https://github.com/eastlondoner/mineflare-cli/raw/refs/heads/main/README.md \
