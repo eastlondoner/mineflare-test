@@ -9,19 +9,18 @@ import { AsyncLocalStorage } from "async_hooks";
 
 
 const env = workerEnv as typeof worker.Env;
-const singletonContainerId = "mineflare-singleton-container";
+const singletonContainerId = "cf-singleton-container";
 
 export const asyncLocalStorage = new AsyncLocalStorage<{ cf: CfProperties | undefined }>();
 
 export function getMinecraftContainer() {
     const cf = asyncLocalStorage.getStore()?.cf;
+    const containerId = env.MINECRAFT_CONTAINER.idFromName(singletonContainerId);
     if(!cf) {
-        const containerId = env.MINECRAFT_CONTAINER.idFromName(singletonContainerId);
         console.log("No cf object found in async local storage. Skipping location hint.");
         return env.MINECRAFT_CONTAINER.get(containerId);
     }
     const locationHint = getLocationHint(cf);
-    const containerId = env.MINECRAFT_CONTAINER.idFromName(singletonContainerId + "-" + locationHint);
     console.log("setting location hint to", locationHint, "based on request");
     return env.MINECRAFT_CONTAINER.get(containerId, { locationHint });
 }
