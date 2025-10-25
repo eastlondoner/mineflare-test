@@ -1,0 +1,100 @@
+name: Build Docker Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker_src/**'
+      - 'container_src/**'
+      - '.github/workflows/build-docker-images.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'docker_src/**'
+      - 'container_src/**'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  build:
+    # Only run in the eastlondoner/mineflare-test repository
+    if: github.repository == 'eastlondoner/mineflare-test'
+    
+    runs-on: ubuntu-latest-8-cores # Reasonably powerful instance (8 vCPU, 32 GB RAM)
+    
+    permissions:
+      contents: write # Required to push commits back to the repository
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build Docker images
+        run: bun run build
+        env:
+          # The build script will push images to DockerHub
+          SKIP_PUSH: 'false'
+          # Build for both amd64 and arm64
+          DOCKER_PLATFORMS: 'linux/amd64,linux/arm64'
+          # Use the default repo or override if needed
+          # BASE_DOCKERFILE: 'andrewjefferson/mineflare-base'
+
+      - name: Commit and push .BASE_DOCKERFILE
+        if: success() && github.event_name != 'pull_request'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Check if .BASE_DOCKERFILE has changed
+          if git diff --quiet docker_src/.BASE_DOCKERFILE; then
+            echo "No changes to .BASE_DOCKERFILE, skipping commit"
+          else
+            git add docker_src/.BASE_DOCKERFILE
+            git commit -m "chore: update Docker image tag [skip ci]"
+            git push
+            echo "✅ Committed and pushed .BASE_DOCKERFILE" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            docker_src/.BASE_DOCKERFILE
+            docker_src/.BUILD_CONTAINER_SERVICES
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "✅ Docker images built and pushed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat docker_src/.BASE_DOCKERFILE >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
