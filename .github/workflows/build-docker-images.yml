@@ -54,6 +54,7 @@ jobs:
       - name: Build Docker images
         run: bun run build
         env:
+          CI: ''
           # The build script will push images to DockerHub
           SKIP_PUSH: 'false'
           # Build for both amd64 and arm64
