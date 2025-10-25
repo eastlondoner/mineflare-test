@@ -21,7 +21,7 @@ jobs:
     # Only run in the eastlondoner/mineflare-test repository
     if: github.repository == 'eastlondoner/mineflare-test'
     
-    runs-on: ubuntu-latest-8-cores # Reasonably powerful instance (8 vCPU, 32 GB RAM)
+    runs-on: ubuntu-latest
     
     permissions:
       contents: write # Required to push commits back to the repository
