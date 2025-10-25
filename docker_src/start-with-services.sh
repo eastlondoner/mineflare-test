@@ -476,12 +476,17 @@ start_ttyd() {
 
   echo "Using ttyd binary: $TTYD_BINARY"
 
+  # Ensure bun and other tools are on PATH for all terminals
+  export PATH="/opt/bun/bin:/data/.local/bin:${PATH}"
+  echo "PATH for terminals: $PATH"
+
   # Common ttyd client options
   TTYD_THEME='{"background":"#0a1612","foreground":"#e0e0e0","cursor":"#55FF55","cursorAccent":"#0a1612","selectionBackground":"#57A64E"}'
 
   # Run ttyd for Claude (port 7681) with shared PTY mode
   (
     export CLAUDE_HOME="/data/.local/claude"
+    export PATH="/opt/bun/bin:/data/.local/bin:${PATH}"
     while true; do
       echo "Starting ttyd for Claude on port $CLAUDE_PORT with shared PTY mode (attempt at $(date))"
       "$TTYD_BINARY" \
@@ -504,6 +509,7 @@ start_ttyd() {
   # Run ttyd for Codex (port 7682) with shared PTY mode
   (
     export CODEX_HOME="/data/.local/codex"
+    export PATH="/opt/bun/bin:/data/.local/bin:${PATH}"
     while true; do
       echo "Starting ttyd for Codex on port $CODEX_PORT with shared PTY mode (attempt at $(date))"
       "$TTYD_BINARY" \
@@ -526,6 +532,7 @@ start_ttyd() {
   # Run ttyd for Gemini (port 7683) with shared PTY mode
   (
     export GEMINI_SUPPRESS_HOME_WARNING=1
+    export PATH="/opt/bun/bin:/data/.local/bin:${PATH}"
     while true; do
       echo "Starting ttyd for Gemini on port $GEMINI_PORT with shared PTY mode (attempt at $(date))"
       "$TTYD_BINARY" \
@@ -547,6 +554,7 @@ start_ttyd() {
 
   # Run ttyd for Bash (port 7684) with shared PTY mode
   (
+    export PATH="/opt/bun/bin:/data/.local/bin:${PATH}"
     while true; do
       echo "Starting ttyd for Bash on port $BASH_PORT with shared PTY mode (attempt at $(date))"
       "$TTYD_BINARY" \

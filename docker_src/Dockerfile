@@ -45,11 +45,13 @@ RUN apt-get update \
         xdotool \
         ripgrep \
     && curl -fsSL https://tailscale.com/install.sh | sh \
-    && curl -fsSL https://bun.sh/install | bash \
+    && mkdir -p /opt/bun \
+    && BUN_INSTALL="/opt/bun" curl -fsSL https://bun.sh/install | bash \
     && mkdir -p $(dirname "${TAILSCALE_STATE_DIR}") \
     && mkdir -p /data/plugins \
     && echo "minecraft ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/minecraft \
     && chmod 0440 /etc/sudoers.d/minecraft \
+    && chown -R 1000:1000 /opt/bun \
     && bash /tmp/setup-paper-dev.sh \
     && rm -rf /var/lib/apt/lists/*
 
@@ -62,7 +64,8 @@ ENV SERVER_PORT=25565
 ENV TYPE=PAPER
 # VERSION will be set at runtime by the container (default: 1.21.8)
 ENV VERSION=1.21.8
-ENV PATH="/root/.bun/bin:/data/.local/bin:${PATH}"
+ENV PATH="/opt/bun/bin:/data/.local/bin:${PATH}"
+
 
 # Create directories for server jars and plugins outside /data
 RUN mkdir -p /opt/minecraft/server /opt/minecraft/plugins
