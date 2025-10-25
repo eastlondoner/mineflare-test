@@ -466,7 +466,11 @@ export default {
   async fetch(request: Request, _env: typeof worker.Env): Promise<Response> {
     const url = new URL(request.url);
 
-    return asyncLocalStorage.run({ cf: request.cf }, async () => {
+    // TODO: Extract container ID from request path/headers for multi-container support
+    // For now, use the default singleton container ID
+    const containerId = "cf-singleton-container";
+
+    return asyncLocalStorage.run({ cf: request.cf, containerId }, async () => {
       // auth methods do not require auth - but browser/terminal HTML pages DO require auth
       // Only skip auth for WebSocket upgrades (ws protocol or /ws path with Upgrade header)
       const isWebSocketUpgrade = url.protocol.startsWith('ws') || 

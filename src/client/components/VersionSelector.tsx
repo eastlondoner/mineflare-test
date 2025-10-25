@@ -42,6 +42,19 @@ export function VersionSelector({ currentVersion, supportedVersions, serverState
     }
   };
 
+  // Check if hovering over a lower version (downgrade)
+  const isDowngrade = () => {
+    if (!hoveredVersion || hoveredVersion === currentVersion) return false;
+    
+    // Parse versions to compare (e.g., "1.21.7" -> 1.217)
+    const parseVersion = (v: string) => {
+      const parts = v.split('.').map(Number);
+      return parts[0] * 1000 + parts[1] * 10 + (parts[2] || 0) * 0.1;
+    };
+    
+    return parseVersion(hoveredVersion) < parseVersion(currentVersion);
+  };
+
   return (
     <div style={{
       background: 'rgba(26, 46, 30, 0.4)',
@@ -204,23 +217,25 @@ export function VersionSelector({ currentVersion, supportedVersions, serverState
         })}
       </div>
 
-      {/* Warning message */}
-      <div style={{
-        padding: '12px 16px',
-        background: 'rgba(255, 182, 0, 0.1)',
-        border: '1px solid rgba(255, 182, 0, 0.3)',
-        borderRadius: '8px',
-        color: '#FFB600',
-        fontSize: '0.75rem',
-        lineHeight: '1.4',
-      }}>
-        <div style={{ marginBottom: '4px', fontWeight: '600' }}>
-          ⚠️ Important
+      {/* Warning message - only show when hovering over a downgrade */}
+      {isDowngrade() && (
+        <div style={{
+          padding: '12px 16px',
+          background: 'rgba(255, 182, 0, 0.1)',
+          border: '1px solid rgba(255, 182, 0, 0.3)',
+          borderRadius: '8px',
+          color: '#FFB600',
+          fontSize: '0.75rem',
+          lineHeight: '1.4',
+        }}>
+          <div style={{ marginBottom: '4px', fontWeight: '600' }}>
+            ⚠️ Important
+          </div>
+          <div style={{ color: '#d4a356' }}>
+            • Downgrading may not be fully supported
+          </div>
         </div>
-        <div style={{ color: '#d4a356' }}>
-          • Downgrading may not be fully supported
-        </div>
-      </div>
+      )}
 
       {updating && (
         <div style={{

@@ -11,18 +11,32 @@ import { AsyncLocalStorage } from "async_hooks";
 const env = workerEnv as typeof worker.Env;
 const singletonContainerId = "cf-singleton-container";
 
-export const asyncLocalStorage = new AsyncLocalStorage<{ cf: CfProperties | undefined }>();
+export const asyncLocalStorage = new AsyncLocalStorage<{ 
+    cf: CfProperties | undefined;
+    containerId: string;
+}>();
+
+/**
+ * Get the current container ID from async local storage, or return the default singleton ID
+ */
+export function getCurrentContainerId(): string {
+    return asyncLocalStorage.getStore()?.containerId ?? singletonContainerId;
+}
 
 export function getMinecraftContainer() {
-    const cf = asyncLocalStorage.getStore()?.cf;
-    const containerId = env.MINECRAFT_CONTAINER.idFromName(singletonContainerId);
+    const store = asyncLocalStorage.getStore();
+    const cf = store?.cf;
+    const containerId = store?.containerId ?? singletonContainerId;
+    
     if(!cf) {
+        const id = env.MINECRAFT_CONTAINER.idFromName(containerId);
         console.log("No cf object found in async local storage. Skipping location hint.");
-        return env.MINECRAFT_CONTAINER.get(containerId);
+        return env.MINECRAFT_CONTAINER.get(id);
     }
     const locationHint = getLocationHint(cf);
+    const id = env.MINECRAFT_CONTAINER.idFromName(containerId);
     console.log("setting location hint to", locationHint, "based on request");
-    return env.MINECRAFT_CONTAINER.get(containerId, { locationHint });
+    return env.MINECRAFT_CONTAINER.get(id, { locationHint });
 }
 
 function exhaustiveCheck(value: never): never {

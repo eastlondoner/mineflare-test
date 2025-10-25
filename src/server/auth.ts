@@ -6,7 +6,7 @@ import Elysia from "elysia";
 import { getNodeEnv } from "../client/utils/node-env";
 import { CloudflareAdapter } from "elysia/adapter/cloudflare-worker";
 import cors from "@elysiajs/cors";
-import { getMinecraftContainer } from "./get-minecraft-container";
+import { getMinecraftContainer, getCurrentContainerId } from "./get-minecraft-container";
 import { env as workerEnv } from 'cloudflare:workers'
 import type { worker } from "../../alchemy.run";
 
@@ -94,7 +94,10 @@ function buildClearCookie(): string {
 async function getPasswordSetCached(request: Request): Promise<boolean> {
   // Force setup mode when reset flag is enabled
   if (isResetMode()) return false;
-  const cacheKeyReq = new Request(new URL('/__mf/password-set-v1', request.url).toString(), { method: 'GET' });
+  
+  // Include container ID in cache key to support multiple containers
+  const containerId = getCurrentContainerId();
+  const cacheKeyReq = new Request(new URL(`/__mf/password-set-v1/${containerId}`, request.url).toString(), { method: 'GET' });
   
   // Try cache first
   const cache = await caches.open('mf-auth');
@@ -125,7 +128,10 @@ async function getPasswordSetCached(request: Request): Promise<boolean> {
 async function getSymKeyCached(request: Request): Promise<string | null> {
   // Disable auth while in reset mode
   if (isResetMode()) return null;
-  const cacheKeyReq = new Request(new URL('/__mf/sym-key-v1', request.url).toString(), { method: 'GET' });
+  
+  // Include container ID in cache key to support multiple containers
+  const containerId = getCurrentContainerId();
+  const cacheKeyReq = new Request(new URL(`/__mf/sym-key-v1/${containerId}`, request.url).toString(), { method: 'GET' });
   
   // Try cache first
   const cache = await caches.open('mf-auth');
@@ -280,15 +286,16 @@ export const authApp = (
       if (isResetMode()) {
         await container.clearAuth();
         
-        // Clear cached auth data
+        // Clear cached auth data (container-specific)
+        const containerId = getCurrentContainerId();
         const cache = await caches.open('mf-auth');
-        const symKeyCacheReq = new Request(new URL('/__mf/sym-key-v1', request.url).toString(), { method: 'GET' });
-        const passwordSetCacheReq = new Request(new URL('/__mf/password-set-v1', request.url).toString(), { method: 'GET' });
+        const symKeyCacheReq = new Request(new URL(`/__mf/sym-key-v1/${containerId}`, request.url).toString(), { method: 'GET' });
+        const passwordSetCacheReq = new Request(new URL(`/__mf/password-set-v1/${containerId}`, request.url).toString(), { method: 'GET' });
         await Promise.all([
           cache.delete(symKeyCacheReq),
           cache.delete(passwordSetCacheReq)
         ]);
-        console.log("Cleared cached auth data");
+        console.log("Cleared cached auth data for container:", containerId);
       }
       console.log("Calling setupPassword on container...");
       const result = await container.setupPassword({ password });
@@ -303,10 +310,11 @@ export const authApp = (
       }
       
       console.log("Password created successfully, seeding cache...");
-      // Seed cache with both the symmetric key and password-set status
+      // Seed cache with both the symmetric key and password-set status (container-specific)
+      const containerId = getCurrentContainerId();
       const cache = await caches.open('mf-auth');
       
-      const symKeyCacheReq = new Request(new URL('/__mf/sym-key-v1', request.url).toString(), { method: 'GET' });
+      const symKeyCacheReq = new Request(new URL(`/__mf/sym-key-v1/${containerId}`, request.url).toString(), { method: 'GET' });
       await cache.put(
         symKeyCacheReq,
         new Response(result.symKey, {
@@ -317,7 +325,7 @@ export const authApp = (
         })
       );
       
-      const passwordSetCacheReq = new Request(new URL('/__mf/password-set-v1', request.url).toString(), { method: 'GET' });
+      const passwordSetCacheReq = new Request(new URL(`/__mf/password-set-v1/${containerId}`, request.url).toString(), { method: 'GET' });
       await cache.put(
         passwordSetCacheReq,
         new Response('true', {
