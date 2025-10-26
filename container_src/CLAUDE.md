@@ -46,18 +46,75 @@ The `mineflare` CLI is available at `/opt/mineflare` as a node package. You can 
 
 **Documentation**: Full documentation is available at `/docs/MINEFLARE_CLI.md` and `/docs/mineflare_EXECUTABLE.md`
 
-**Quick Start**:
+The bot connects to localhost:25565 by default (the Minecraft server running in this container). You can configure it via environment variables or the `.env` file.
+
+### Important: Bot Connection Timing
+
+The mineflare bot server starts in **two phases**:
+
+1. HTTP API becomes available immediately (~1 second)
+2. Bot connects to Minecraft and spawns (~5-10 seconds)
+
+**CRITICAL**: Always verify the bot is connected before running bot commands:
+
 ```bash
-# Start the bot server as a daemon
-mineflare server start --daemon
+# Start the server (in /data/mineflare-cli directory)
+cd /data/mineflare-cli
+bun start > /tmp/mineflare.log 2>&1 &
 
-# Control the bot
-mineflare chat "Hello world!"
-mineflare move -x 1 --sprint
-mineflare batch -f examples/batch-simple.json
+# Wait for bot to connect (REQUIRED - do not skip this)
+sleep 10
 
-# Stop the server
-mineflare server stop
+# Verify bot is connected before running commands
+bun run mineflare health
+# Should show: "botConnected": true
+
+# If botConnected is false, wait longer and check again
+sleep 5 && bun run mineflare health
 ```
 
-The bot connects to localhost:25565 by default (the Minecraft server running in this container). You can configure it via environment variables or the `.env` file.
+**Checking Connection Status**:
+
+```bash
+# Method 1: Check health endpoint
+bun run mineflare health
+# Look for: "botConnected": true
+
+# Method 2: Check server logs for spawn event
+tail -20 /tmp/mineflare.log | grep "Bot spawned"
+
+# Method 3: Check events
+bun run mineflare events --since 0
+# Should show a "spawn" event if connected
+```
+
+**Common Issues**:
+- "Request failed with status code 400" - Bot not connected yet, wait longer
+- "botConnected: false" - Connection in progress, wait 5-10 more seconds
+- Port 3000 already in use - Clean up old process: `pkill -f "bun.*server.js"`
+
+**Proper Startup Sequence**:
+
+```bash
+# 1. Navigate to directory
+cd /data/mineflare-cli
+
+# 2. Clean up any old processes
+pkill -f "bun.*server.js" 2>/dev/null || true
+
+# 3. Start server with logging
+bun start > /tmp/mineflare.log 2>&1 &
+
+# 4. Wait for connection (REQUIRED)
+sleep 10
+
+# 5. Verify connection
+bun run mineflare health
+
+# 6. Check bot state
+bun run mineflare state
+
+# Now safe to run bot commands
+```
+
+**Running Bot Commands**: Only run bot commands (move, dig, state, inventory, etc.) after confirming `botConnected: true`. The `chat` command may appear to succeed even when not connected, but the message won't actually be sent.
