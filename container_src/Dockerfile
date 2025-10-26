@@ -33,8 +33,6 @@ RUN mkdir -p /data/.local/gemini/checkpoints \
     /data/.local/codex \
     /data/.local/claude
 
-RUN printenv && exit 0
-
 # Configure Gemini CLI for maximum autonomy
 RUN sudo mkdir -p /etc/gemini-cli/ && sudo chown 1000:1000 /etc/gemini-cli/ && sudo chmod 755 /etc/gemini-cli/
 COPY gemini-settings.json /etc/gemini-cli/system-defaults.json
