@@ -124,7 +124,7 @@ RUN set -eux; \
     tar -xzf /tmp/mineflare-cli-source.tar.gz -C /opt/mineflare --strip-components=1; \
     cd /opt/mineflare; \
     /opt/bun/bin/bun install --production; \
-    /opt/bun/bin/bun link; \
+    /opt/bun/bin/bun install -g .; \
     chown -R 1000:1000 /opt/mineflare; \
     cd /; \
     rm -rf /tmp/*; \
