@@ -32,10 +32,9 @@ if [[ "$OFFLINE_FLAG" == "true" ]]; then
     echo "Offline mode detected; verifying cached container service binaries..."
 
     REQUIRED_FILES=(
-        "http-proxy-x64"
-        "http-proxy-arm64"
-        "file-server-x64"
-        "file-server-arm64"
+        "http-proxy.ts"
+        "file-server.ts"
+        "gemini.js"
         "hteetp-linux-x64"
         "hteetp-linux-arm64"
         "ttyd-x64"
@@ -44,8 +43,6 @@ if [[ "$OFFLINE_FLAG" == "true" ]]; then
         "claude-arm64"
         "codex-x64"
         "codex-arm64"
-        "gemini-x64"
-        "gemini-arm64"
         "chrome-x64.tar.gz"
         "chrome-arm64.tar.gz"
         "mineflare-x64"
@@ -108,81 +105,7 @@ sha256_file() {
     fi
 }
 
-# Function to build http-proxy binaries
-build_http_proxy() {
-    local log_file="$LOG_DIR/http-proxy.log"
-    {
-        echo "=== Building HTTP Proxy ==="
-
-        echo "Compiling http-proxy.ts for linux-x64..."
-        bun build --compile ./http-proxy.ts --target=bun-linux-x64 --outfile=http-proxy-x64
-
-        if [ -f "./http-proxy-x64" ]; then
-            echo "✓ Build successful! Binary created: ./http-proxy-x64"
-            ls -lh ./http-proxy-x64
-        else
-            echo "✗ x64 build failed!"
-            return 1
-        fi
-
-        echo "Compiling http-proxy.ts for linux-arm64..."
-        bun build --compile ./http-proxy.ts --target=bun-linux-arm64 --outfile=http-proxy-arm64
-
-        if [ -f "./http-proxy-arm64" ]; then
-            echo "✓ Build successful! Binary created: ./http-proxy-arm64"
-            ls -lh ./http-proxy-arm64
-        else
-            echo "✗ arm64 build failed!"
-            return 1
-        fi
-
-        echo "✓ HTTP Proxy build completed successfully"
-    } &>"$log_file"
-
-    local exit_status=$?
-    if [[ -f "$log_file" ]]; then
-        cat "$log_file"
-    fi
-    return $exit_status
-}
-
-# Function to build file-server binaries
-build_file_server() {
-    local log_file="$LOG_DIR/file-server.log"
-    {
-        echo "=== Building File Server ==="
-
-        echo "Compiling file-server.ts for linux-x64..."
-        bun build --compile ./file-server.ts --target=bun-linux-x64 --outfile=file-server-x64
-
-        if [ -f "./file-server-x64" ]; then
-            echo "✓ Build successful! Binary created: ./file-server-x64"
-            ls -lh ./file-server-x64
-        else
-            echo "✗ x64 build failed!"
-            return 1
-        fi
-
-        echo "Compiling file-server.ts for linux-arm64..."
-        bun build --compile ./file-server.ts --target=bun-linux-arm64 --outfile=file-server-arm64
-
-        if [ -f "./file-server-arm64" ]; then
-            echo "✓ Build successful! Binary created: ./file-server-arm64"
-            ls -lh ./file-server-arm64
-        else
-            echo "✗ arm64 build failed!"
-            return 1
-        fi
-
-        echo "✓ File Server build completed successfully"
-    } &>"$log_file"
-
-    local exit_status=$?
-    if [[ -f "$log_file" ]]; then
-        cat "$log_file"
-    fi
-    return $exit_status
-}
+# Bun-based scripts are now run directly from source, no compilation needed
 
 # Function to download hteetp binaries
 download_hteetp() {
@@ -561,11 +484,11 @@ download_codex() {
     return $exit_status
 }
 
-# Function to build Gemini CLI binaries
-build_gemini() {
+# Function to download Gemini CLI source
+download_gemini() {
     local log_file="$LOG_DIR/gemini.log"
     {
-        echo "=== Building Gemini CLI ==="
+        echo "=== Downloading Gemini CLI ==="
 
         REPO="google-gemini/gemini-cli"
 
@@ -589,32 +512,7 @@ build_gemini() {
             return 1
         fi
 
-        echo "Compiling gemini.js for linux-x64..."
-        bun build --compile ./gemini.js --target=bun-linux-x64 --outfile=gemini-x64
-
-        if [ -f "./gemini-x64" ]; then
-            echo "✓ Build successful! Binary created: ./gemini-x64"
-            ls -lh ./gemini-x64
-        else
-            echo "✗ x64 build failed!"
-            return 1
-        fi
-
-        echo "Compiling gemini.js for linux-arm64..."
-        bun build --compile ./gemini.js --target=bun-linux-arm64 --outfile=gemini-arm64
-
-        if [ -f "./gemini-arm64" ]; then
-            echo "✓ Build successful! Binary created: ./gemini-arm64"
-            ls -lh ./gemini-arm64
-        else
-            echo "✗ arm64 build failed!"
-            return 1
-        fi
-
-        # Clean up source file
-        rm -f gemini.js
-
-        echo "✓ Gemini CLI build completed successfully"
+        echo "✓ Gemini CLI download completed successfully"
     } &>"$log_file"
 
     local exit_status=$?
@@ -846,12 +744,6 @@ echo ""
 # Run all tasks in parallel with a retry
 if [[ "$OFFLINE_FLAG" != "true" ]]; then
 
-    (build_http_proxy || build_http_proxy) &
-    PID_HTTP_PROXY=$!
-
-    (build_file_server || build_file_server) &
-    PID_FILE_SERVER=$!
-
     (download_hteetp || download_hteetp) &
     PID_HTEETP=$!
 
@@ -864,7 +756,7 @@ if [[ "$OFFLINE_FLAG" != "true" ]]; then
     (download_codex || download_codex) &
     PID_CODEX=$!
 
-    (build_gemini || build_gemini) &
+    (download_gemini || download_gemini) &
     PID_GEMINI=$!
 
     (download_chrome || download_chrome) &
@@ -874,8 +766,8 @@ if [[ "$OFFLINE_FLAG" != "true" ]]; then
     PID_MINEFLARE=$!
 
     # Wait for all tasks and collect exit codes (bash 3.2 compatible)
-    PIDS=($PID_HTTP_PROXY $PID_FILE_SERVER $PID_HTEETP $PID_TTYD $PID_CLAUDE $PID_CODEX $PID_GEMINI $PID_CHROME $PID_MINEFLARE)
-    TASK_NAMES=("HTTP Proxy build" "File Server build" "hteetp download" "ttyd download" "Claude Code download" "Codex download" "Gemini CLI build" "Chrome download" "mineflare download")
+    PIDS=($PID_HTEETP $PID_TTYD $PID_CLAUDE $PID_CODEX $PID_GEMINI $PID_CHROME $PID_MINEFLARE)
+    TASK_NAMES=("hteetp download" "ttyd download" "Claude Code download" "Codex download" "Gemini CLI download" "Chrome download" "mineflare download")
     TASK_STATUS=()
 
     # Wait for each task and collect status without aborting on failures (set -e safe)
@@ -907,23 +799,21 @@ fi
 # Summary output
 if [[ ${#FAILED_TASKS[@]} -eq 0 ]]; then
     if [[ "$OFFLINE_FLAG" == "true" ]]; then
-        echo "✓ All required binaries present for offline mode"
+        echo "✓ All required files present for offline mode"
     else
-        echo "✓ All binaries built/downloaded successfully!"
+        echo "✓ All binaries and sources downloaded successfully!"
     fi
-    echo "  - http-proxy-x64, http-proxy-arm64"
-    echo "  - file-server-x64, file-server-arm64"
+    echo "  - http-proxy.ts, file-server.ts, gemini.js (bun sources)"
     echo "  - hteetp-linux-x64, hteetp-linux-arm64"
     echo "  - ttyd-x64, ttyd-arm64"
     echo "  - claude-x64, claude-arm64"
     echo "  - codex-x64, codex-arm64"
-    echo "  - gemini-x64, gemini-arm64"
-    echo "  - chrome-x64, chrome-arm64"
-    echo "  - mineflare-x64, mineflare-x64-baseline"
+    echo "  - chrome-x64.tar.gz, chrome-arm64.tar.gz"
+    echo "  - mineflare-x64, mineflare-arm64"
     exit 0
 else
     if [[ "$OFFLINE_FLAG" == "true" ]]; then
-        echo "✗ Offline build cannot proceed; missing cached binaries:"
+        echo "✗ Offline build cannot proceed; missing cached files:"
     else
         echo "✗ The following tasks failed:"
     fi

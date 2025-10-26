@@ -82,12 +82,11 @@ if (buildServicesHash && existsSync(BUILD_SERVICES_CACHE_FILE)) {
         const hashMatches = cache.hash === buildServicesHash;
         const recentlyRan = (nowMs - cache.lastRunMs) < SIX_HOURS_MS;
         
-        // Verify all required binaries exist
+        // Verify all required binaries and sources exist
         const requiredBinaries = [
-            "./http-proxy-x64",
-            "./http-proxy-arm64",
-            "./file-server-x64",
-            "./file-server-arm64",
+            "./http-proxy.ts",
+            "./file-server.ts",
+            "./gemini.js",
             "./hteetp-linux-x64",
             "./hteetp-linux-arm64",
             "./ttyd-x64",
@@ -96,8 +95,6 @@ if (buildServicesHash && existsSync(BUILD_SERVICES_CACHE_FILE)) {
             "./claude-arm64",
             "./codex-x64",
             "./codex-arm64",
-            "./gemini-x64",
-            "./gemini-arm64",
             "./chrome-x64.tar.gz",
             "./chrome-arm64.tar.gz",
             "./mineflare-x64",

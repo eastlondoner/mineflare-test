@@ -81,16 +81,16 @@ COPY dynmap-configuration.txt /dynmap-configuration.txt
 # Copy all available Dynmap jars, symlink will be set up by start script
 COPY Dynmap-3.7-beta-11-spigot-*.jar /opt/minecraft/plugins/
 
+# Copy bun-based source files that will be run directly
+COPY --chmod=755 http-proxy.ts file-server.ts gemini.js /opt/bun/scripts/
+
 # Copy all binaries to a temporary location. We will select the correct one for the
 # target architecture in the next step.
 COPY --chmod=755 \
-    http-proxy-x64 http-proxy-arm64 \
-    file-server-x64 file-server-arm64 \
     hteetp-linux-x64 hteetp-linux-arm64 \
     ttyd-x64 ttyd-arm64 \
     claude-x64 claude-arm64 \
     codex-x64 codex-arm64 \
-    gemini-x64 gemini-arm64 \
     mineflare-x64 mineflare-arm64 \
     /tmp/
 
@@ -102,8 +102,8 @@ ARG TARGETARCH
 COPY chrome-x64.tar.gz chrome-arm64.tar.gz /tmp/
 
 # Select the correct binaries for the target architecture, move them to /usr/local/bin,
-# and then clean up the temporary files. This is done in a single RUN command to
-# ensure the unused binaries are not left in an intermediate layer.
+# create wrapper scripts for bun-based tools, and then clean up the temporary files.
+# This is done in a single RUN command to ensure the unused binaries are not left in an intermediate layer.
 RUN set -eux; \
     arch_suffix=''; \
     case "$TARGETARCH" in \
@@ -111,18 +111,19 @@ RUN set -eux; \
         "arm64") arch_suffix='arm64' ;; \
         *) echo "Unsupported architecture: $TARGETARCH"; exit 1 ;; \
     esac; \
-    mv "/tmp/http-proxy-$arch_suffix" /usr/local/bin/http-proxy; \
-    mv "/tmp/file-server-$arch_suffix" /usr/local/bin/file-server; \
     mv "/tmp/hteetp-linux-$arch_suffix" /usr/local/bin/hteetp; \
     mv "/tmp/ttyd-$arch_suffix" /usr/local/bin/ttyd; \
     mv "/tmp/claude-$arch_suffix" /usr/local/bin/claude; \
     mv "/tmp/codex-$arch_suffix" /usr/local/bin/codex; \
-    mv "/tmp/gemini-$arch_suffix" /usr/local/bin/gemini; \
     mv "/tmp/mineflare-$arch_suffix" /usr/local/bin/mineflare; \
     mkdir -p /opt/chrome; \
     tar -xzf "/tmp/chrome-$arch_suffix.tar.gz" -C /opt/chrome; \
     chmod -R 755 /opt/chrome; \
-    rm -rf /tmp/*
+    rm -rf /tmp/*; \
+    printf '#!/bin/sh\nexec /opt/bun/bin/bun run /opt/bun/scripts/http-proxy.ts "$@"\n' > /usr/local/bin/http-proxy; \
+    printf '#!/bin/sh\nexec /opt/bun/bin/bun run /opt/bun/scripts/file-server.ts "$@"\n' > /usr/local/bin/file-server; \
+    printf '#!/bin/sh\nexec /opt/bun/bin/bun run /opt/bun/scripts/gemini.js "$@"\n' > /usr/local/bin/gemini; \
+    chmod +x /usr/local/bin/http-proxy /usr/local/bin/file-server /usr/local/bin/gemini
 
 # Fetch latest mineflare-cli README and place in /docs for AI agent reference
 RUN mkdir -p /docs/mineflare-cli \
