@@ -46,7 +46,7 @@ RUN apt-get update \
         ripgrep \
     && curl -fsSL https://tailscale.com/install.sh | sh \
     && mkdir -p /opt/bun \
-    && BUN_INSTALL="/opt/bun" curl -fsSL https://bun.sh/install | bash \
+    && curl -fsSL https://bun.sh/install | bash && mkdir -p /opt/bun && mv /root/.bun \
     && mkdir -p $(dirname "${TAILSCALE_STATE_DIR}") \
     && mkdir -p /data/plugins \
     && echo "minecraft ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/minecraft \
@@ -59,6 +59,7 @@ RUN apt-get update \
 RUN wget -qO- https://github.com/novnc/websockify/archive/refs/tags/v0.11.0.tar.gz | tar xz -C /opt \
     && mv /opt/websockify-0.11.0 /opt/websockify
 
+ENV BUN_INSTALL=/opt/bun
 ENV TAILSCALE_STATE_DIR=/var/lib/tailscale/tailscaled.state
 ENV SERVER_PORT=25565
 ENV TYPE=PAPER
