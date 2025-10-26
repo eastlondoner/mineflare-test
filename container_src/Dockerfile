@@ -7,6 +7,15 @@ ENV XDG_DATA_HOME=/data/.local
 ENV XDG_CONFIG_HOME=/data/.config
 ENV XDG_CACHE_HOME=/data/.cache
 
+# Create temp directory for minecraft user outside /data (not backed up)
+# This fixes Bun's "unable to write files to tempdir" error
+RUN mkdir -p /var/tmp/minecraft && \
+    chown 1000:1000 /var/tmp/minecraft && \
+    chmod 1777 /var/tmp/minecraft
+
+ENV TMPDIR=/var/tmp/minecraft
+ENV BUN_TMPDIR=/var/tmp/minecraft
+
 USER 1000:1000
 
 # Create symlink from /home/minecraft to /data and set HOME - note this is NOT creating a circular reference
