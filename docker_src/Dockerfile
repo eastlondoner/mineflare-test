@@ -46,7 +46,7 @@ RUN apt-get update \
         ripgrep \
     && curl -fsSL https://tailscale.com/install.sh | sh \
     && mkdir -p /opt/bun \
-    && curl -fsSL https://bun.sh/install | bash && mkdir -p /opt/bun && mv /root/.bun \
+    && curl -fsSL https://bun.sh/install | bash && mkdir -p /opt/bun && mv /root/.bun /opt/bun \
     && mkdir -p $(dirname "${TAILSCALE_STATE_DIR}") \
     && mkdir -p /data/plugins \
     && echo "minecraft ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/minecraft \

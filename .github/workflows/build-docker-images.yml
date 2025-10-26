@@ -16,6 +16,10 @@ on:
       - 'container_src/**'
   workflow_dispatch: # Allow manual triggering
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     # Only run in the eastlondoner/mineflare-test repository
