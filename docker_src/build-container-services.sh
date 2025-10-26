@@ -45,8 +45,7 @@ if [[ "$OFFLINE_FLAG" == "true" ]]; then
         "codex-arm64"
         "chrome-x64.tar.gz"
         "chrome-arm64.tar.gz"
-        "mineflare-x64"
-        "mineflare-arm64"
+        "mineflare-cli-source.tar.gz"
     )
 
     MISSING_FILES=()
@@ -590,11 +589,11 @@ download_chrome() {
     return $exit_status
 }
 
-# Function to download Mineflare binaries
+# Function to download Mineflare source package
 download_mineflare() {
     local log_file="$LOG_DIR/mineflare.log"
     {
-        echo "=== Downloading mineflare binaries ==="
+        echo "=== Downloading mineflare source package ==="
 
         REPO="eastlondoner/mineflare-cli"
 
@@ -608,126 +607,66 @@ download_mineflare() {
 
         echo "Latest mineflare version: $MINEFLARE_VERSION"
 
-        local archive_x64="mineflare-linux-x64.tar.gz"
-        local checksum_x64="mineflare-linux-x64.tar.gz.sha256"
-        local binary_x64="mineflare-x64"
+        local source_archive="mineflare-cli-source.tar.gz"
+        local checksum_file="mineflare-cli-source.tar.gz.sha256"
 
-        echo "Checking mineflare-linux-x64..."
-        MINEFLARE_URL_X64="https://github.com/$REPO/releases/download/${MINEFLARE_VERSION}/mineflare-linux-x64.tar.gz"
-        MINEFLARE_SHA_URL_X64="${MINEFLARE_URL_X64}.sha256"
+        # Try to get source package from release assets first
+        echo "Checking for source package in release assets..."
+        MINEFLARE_SOURCE_URL="https://github.com/$REPO/releases/download/${MINEFLARE_VERSION}/mineflare-cli-source.tar.gz"
+        MINEFLARE_SHA_URL="${MINEFLARE_SOURCE_URL}.sha256"
 
-        # Download checksum file first
-        if curl -fsSL "${GITHUB_AUTH_HEADER[@]}" -o "$checksum_x64" "$MINEFLARE_SHA_URL_X64"; then
-            expected_sha_x64=$(cut -d' ' -f1 "$checksum_x64")
-
-            # Check if binary already exists with matching checksum
-            if [[ -f "$binary_x64" ]]; then
-                actual_sha_x64=$(sha256_file "$binary_x64")
-                if [[ "$expected_sha_x64" == "$actual_sha_x64" ]]; then
-                    echo "✓ $binary_x64 already cached with matching checksum, skipping download"
-                    rm -f "$checksum_x64"
+        # Try downloading the custom source tarball from release assets
+        if curl -fsSL "${GITHUB_AUTH_HEADER[@]}" -o "$checksum_file" "$MINEFLARE_SHA_URL" 2>/dev/null; then
+            expected_sha=$(cut -d' ' -f1 "$checksum_file")
+            
+            # Check if we already have the correct source archive
+            if [[ -f "$source_archive" ]]; then
+                actual_sha=$(sha256_file "$source_archive")
+                if [[ "$expected_sha" == "$actual_sha" ]]; then
+                    echo "✓ $source_archive already cached with matching checksum, skipping download"
+                    rm -f "$checksum_file"
+                    return 0
                 else
-                    echo "Local $binary_x64 checksum mismatch, re-downloading..."
-                    rm -f "$binary_x64"
+                    echo "Local $source_archive checksum mismatch, re-downloading..."
+                    rm -f "$source_archive"
                 fi
             fi
 
-            # Download if binary doesn't exist or checksum didn't match
-            if [[ ! -f "$binary_x64" ]]; then
-                echo "Downloading mineflare-linux-x64..."
-                if curl -fsSL "${GITHUB_AUTH_HEADER[@]}" -o "$archive_x64" "$MINEFLARE_URL_X64"; then
-                    echo "✓ Downloaded $archive_x64"
-                    actual_sha_x64=$(sha256_file "$archive_x64")
-                    if [[ "$expected_sha_x64" != "$actual_sha_x64" ]]; then
-                        echo "✗ SHA256 mismatch for $archive_x64"
-                        echo "  Expected: $expected_sha_x64"
-                        echo "  Actual:   $actual_sha_x64"
-                        rm -f "$archive_x64" "$checksum_x64"
-                        return 1
-                    fi
-                    tar -xzf "$archive_x64"
-                    rm -f "$archive_x64"
-                    if [[ -f mineflare-linux-x64 ]]; then
-                        mv mineflare-linux-x64 "$binary_x64"
-                        chmod +x "$binary_x64"
-                        ls -lh ./"$binary_x64"
-                    else
-                        echo "✗ Extracted archive did not contain mineflare binary"
-                        rm -f "$checksum_x64"
-                        return 1
-                    fi
-                else
-                    echo "✗ Failed to download mineflare-x64!"
-                    rm -f "$checksum_x64"
+            echo "Downloading mineflare source package from release assets..."
+            if curl -fsSL "${GITHUB_AUTH_HEADER[@]}" -o "$source_archive" "$MINEFLARE_SOURCE_URL"; then
+                echo "✓ Downloaded $source_archive"
+                actual_sha=$(sha256_file "$source_archive")
+                if [[ "$expected_sha" != "$actual_sha" ]]; then
+                    echo "✗ SHA256 mismatch for $source_archive"
+                    echo "  Expected: $expected_sha"
+                    echo "  Actual:   $actual_sha"
+                    rm -f "$source_archive" "$checksum_file"
                     return 1
                 fi
+                rm -f "$checksum_file"
+                ls -lh ./"$source_archive"
+                echo "✓ Mineflare source download completed successfully"
+                return 0
+            else
+                echo "✗ Failed to download from release assets, trying GitHub archive..."
+                rm -f "$checksum_file"
             fi
-            rm -f "$checksum_x64"
         else
-            echo "✗ Failed to download checksum file!"
-            return 1
+            echo "No custom source package in release assets, using GitHub archive..."
         fi
 
-        local archive_arm64="mineflare-linux-arm64.tar.gz"
-        local checksum_arm64="mineflare-linux-arm64.tar.gz.sha256"
-        local binary_arm64="mineflare-arm64"
-
-        echo "Checking mineflare-linux-arm64..."
-        MINEFLARE_URL_ARM64="https://github.com/$REPO/releases/download/${MINEFLARE_VERSION}/mineflare-linux-arm64.tar.gz"
-        MINEFLARE_SHA_URL_ARM64="${MINEFLARE_URL_ARM64}.sha256"
-
-        # Download checksum file first
-        if curl -fsSL "${GITHUB_AUTH_HEADER[@]}" -o "$checksum_arm64" "$MINEFLARE_SHA_URL_ARM64"; then
-            expected_sha_arm64=$(cut -d' ' -f1 "$checksum_arm64")
-
-            # Check if binary already exists with matching checksum
-            if [[ -f "$binary_arm64" ]]; then
-                actual_sha_arm64=$(sha256_file "$binary_arm64")
-                if [[ "$expected_sha_arm64" == "$actual_sha_arm64" ]]; then
-                    echo "✓ $binary_arm64 already cached with matching checksum, skipping download"
-                    rm -f "$checksum_arm64"
-                else
-                    echo "Local $binary_arm64 checksum mismatch, re-downloading..."
-                    rm -f "$binary_arm64"
-                fi
-            fi
-
-            # Download if binary doesn't exist or checksum didn't match
-            if [[ ! -f "$binary_arm64" ]]; then
-                echo "Downloading mineflare-linux-arm64..."
-                if curl -fsSL "${GITHUB_AUTH_HEADER[@]}" -o "$archive_arm64" "$MINEFLARE_URL_ARM64"; then
-                    echo "✓ Downloaded $archive_arm64"
-                    actual_sha_arm64=$(sha256_file "$archive_arm64")
-                    if [[ "$expected_sha_arm64" != "$actual_sha_arm64" ]]; then
-                        echo "✗ SHA256 mismatch for $archive_arm64"
-                        echo "  Expected: $expected_sha_arm64"
-                        echo "  Actual:   $actual_sha_arm64"
-                        rm -f "$archive_arm64" "$checksum_arm64"
-                        return 1
-                    fi
-                    tar -xzf "$archive_arm64"
-                    rm -f "$archive_arm64"
-                    if [[ -f mineflare-linux-arm64 ]]; then
-                        mv mineflare-linux-arm64 "$binary_arm64"
-                        chmod +x "$binary_arm64"
-                        ls -lh ./"$binary_arm64"
-                    else
-                        echo "✗ Extracted archive did not contain mineflare ARM64 binary"
-                        rm -f "$checksum_arm64"
-                        return 1
-                    fi
-                else
-                    echo "✗ Failed to download mineflare ARM64 binary!"
-                    rm -f "$checksum_arm64"
-                    return 1
-                fi
-            fi
-            rm -f "$checksum_arm64"
+        # Fallback to GitHub's automatic source archive
+        echo "Downloading source archive from GitHub..."
+        GITHUB_ARCHIVE_URL="https://github.com/$REPO/archive/refs/tags/${MINEFLARE_VERSION}.tar.gz"
+        
+        if curl -fsSL "${GITHUB_AUTH_HEADER[@]}" -o "$source_archive" "$GITHUB_ARCHIVE_URL"; then
+            echo "✓ Downloaded $source_archive from GitHub archive"
+            ls -lh ./"$source_archive"
+            echo "✓ Mineflare source download completed successfully"
         else
-            echo "✗ Failed to download checksum file!"
+            echo "✗ Failed to download mineflare source package!"
             return 1
         fi
-        echo "✓ Mineflare download completed successfully"
     } &>"$log_file"
 
     local exit_status=$?
@@ -809,7 +748,7 @@ if [[ ${#FAILED_TASKS[@]} -eq 0 ]]; then
     echo "  - claude-x64, claude-arm64"
     echo "  - codex-x64, codex-arm64"
     echo "  - chrome-x64.tar.gz, chrome-arm64.tar.gz"
-    echo "  - mineflare-x64, mineflare-arm64"
+    echo "  - mineflare-cli-source.tar.gz (source package)"
     exit 0
 else
     if [[ "$OFFLINE_FLAG" == "true" ]]; then

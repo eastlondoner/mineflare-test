@@ -45,14 +45,28 @@ export function VersionSelector({ currentVersion, supportedVersions, serverState
   // Check if hovering over a lower version (downgrade)
   const isDowngrade = () => {
     if (!hoveredVersion || hoveredVersion === currentVersion) return false;
-    
-    // Parse versions to compare (e.g., "1.21.7" -> 1.217)
-    const parseVersion = (v: string) => {
-      const parts = v.split('.').map(Number);
-      return parts[0] * 1000 + parts[1] * 10 + (parts[2] || 0) * 0.1;
+
+    // Compare versions as tuples (semantic version comparison)
+    const compareVersions = (v1: string, v2: string): number => {
+      const parts1 = v1.split('.').map(Number);
+      const parts2 = v2.split('.').map(Number);
+
+      const maxLen = Math.max(parts1.length, parts2.length);
+
+      // Pad with zeros to ensure equal length
+      while (parts1.length < maxLen) parts1.push(0);
+      while (parts2.length < maxLen) parts2.push(0);
+
+      // Compare each part numerically
+      for (let i = 0; i < maxLen; i++) {
+        if (parts1[i] < parts2[i]) return -1;
+        if (parts1[i] > parts2[i]) return 1;
+      }
+
+      return 0;
     };
-    
-    return parseVersion(hoveredVersion) < parseVersion(currentVersion);
+
+    return compareVersions(hoveredVersion, currentVersion) < 0;
   };
 
   return (

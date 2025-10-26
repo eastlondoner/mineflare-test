@@ -45,8 +45,7 @@ RUN apt-get update \
         xdotool \
         ripgrep \
     && curl -fsSL https://tailscale.com/install.sh | sh \
-    && mkdir -p /opt/bun \
-    && curl -fsSL https://bun.sh/install | bash && mkdir -p /opt/bun && mv /root/.bun /opt/bun \
+    && curl -fsSL https://bun.sh/install | bash && mv /root/.bun /opt/bun \
     && mkdir -p $(dirname "${TAILSCALE_STATE_DIR}") \
     && mkdir -p /data/plugins \
     && echo "minecraft ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/minecraft \
@@ -84,6 +83,9 @@ COPY Dynmap-3.7-beta-11-spigot-*.jar /opt/minecraft/plugins/
 # Copy bun-based source files that will be run directly
 COPY --chmod=755 http-proxy.ts file-server.ts gemini.js /opt/bun/scripts/
 
+# Copy mineflare source package for installation
+COPY mineflare-cli-source.tar.gz /tmp/
+
 # Copy all binaries to a temporary location. We will select the correct one for the
 # target architecture in the next step.
 COPY --chmod=755 \
@@ -91,7 +93,6 @@ COPY --chmod=755 \
     ttyd-x64 ttyd-arm64 \
     claude-x64 claude-arm64 \
     codex-x64 codex-arm64 \
-    mineflare-x64 mineflare-arm64 \
     /tmp/
 
 # Copy all Chrome binaries to a temporary location. We will select the correct one for the
@@ -102,7 +103,8 @@ ARG TARGETARCH
 COPY chrome-x64.tar.gz chrome-arm64.tar.gz /tmp/
 
 # Select the correct binaries for the target architecture, move them to /usr/local/bin,
-# create wrapper scripts for bun-based tools, and then clean up the temporary files.
+# extract and install mineflare from source, create wrapper scripts for bun-based tools,
+# and then clean up the temporary files.
 # This is done in a single RUN command to ensure the unused binaries are not left in an intermediate layer.
 RUN set -eux; \
     arch_suffix=''; \
@@ -115,10 +117,15 @@ RUN set -eux; \
     mv "/tmp/ttyd-$arch_suffix" /usr/local/bin/ttyd; \
     mv "/tmp/claude-$arch_suffix" /usr/local/bin/claude; \
     mv "/tmp/codex-$arch_suffix" /usr/local/bin/codex; \
-    mv "/tmp/mineflare-$arch_suffix" /usr/local/bin/mineflare; \
     mkdir -p /opt/chrome; \
     tar -xzf "/tmp/chrome-$arch_suffix.tar.gz" -C /opt/chrome; \
     chmod -R 755 /opt/chrome; \
+    mkdir -p /opt/mineflare; \
+    tar -xzf /tmp/mineflare-cli-source.tar.gz -C /opt/mineflare --strip-components=1; \
+    cd /opt/mineflare; \
+    /opt/bun/bin/bun install --production; \
+    /opt/bun/bin/bun link; \
+    cd /; \
     rm -rf /tmp/*; \
     printf '#!/bin/sh\nexec /opt/bun/bin/bun run /opt/bun/scripts/http-proxy.ts "$@"\n' > /usr/local/bin/http-proxy; \
     printf '#!/bin/sh\nexec /opt/bun/bin/bun run /opt/bun/scripts/file-server.ts "$@"\n' > /usr/local/bin/file-server; \

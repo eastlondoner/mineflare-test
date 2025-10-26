@@ -884,12 +884,9 @@ restore_from_backup() {
 }
 
 
-
-
 write_status "Initializing services"
 
 echo "Starting services..."
-
 
 # Start VNC services for embedded browser
 write_status "Starting virtual display (Xvfb)" 
@@ -918,6 +915,14 @@ start_http_proxy
 # Start Tailscale in background if it's enabled
 start_tailscale &
 
+# Restore from backups before starting Minecraft server
+write_status "Checking for backups to restore"
+write_status "Fixing /data permissions"
+# Ensure /data is owned by minecraft user and writable before restore
+sudo chown -R 1000:1000 /data || true
+sudo chmod -R u+rwX /data || true
+restore_from_backup || (sleep 15 && restore_from_backup)
+
 # Setup hteetp binary
 write_status "Setting up hteetp"
 setup_hteetp
@@ -930,18 +935,9 @@ setup_codex
 write_status "Setting up gemini"
 setup_gemini
 
-# Restore from backups before starting Minecraft server
-write_status "Checking for backups to restore"
-write_status "Fixing /data permissions"
-# Ensure /data is owned by minecraft user and writable before restore
-sudo chown -R 1000:1000 /data || true
-sudo chmod -R u+rwX /data || true
-restore_from_backup || (sleep 15 && restore_from_backup)
-
 # Set up server jar symlinks after restore (in case restore overwrote them)
 write_status "Setting up server jar symlinks"
 setup_server_symlinks || true
-
 
 # Start the web terminal (ttyd) after the backups are restored
 write_status "Starting web terminal"

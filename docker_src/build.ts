@@ -97,8 +97,7 @@ if (buildServicesHash && existsSync(BUILD_SERVICES_CACHE_FILE)) {
             "./codex-arm64",
             "./chrome-x64.tar.gz",
             "./chrome-arm64.tar.gz",
-            "./mineflare-x64",
-            "./mineflare-arm64",
+            "./mineflare-cli-source.tar.gz",
         ];
         
         const allBinariesExist = requiredBinaries.every(binary => existsSync(binary));
