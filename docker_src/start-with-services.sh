@@ -756,9 +756,9 @@ setup_server_symlinks() {
   
   symlink_count=0
   
-  # Create symlinks for server jar files
+  # Create symlinks for server jar files from version-specific directory
   for pattern in "${SERVER_JAR_PATTERNS[@]}"; do
-    for jar_file in /opt/minecraft/server/${pattern}; do
+    for jar_file in /opt/minecraft/server/${CURRENT_VERSION}/${pattern}; do
       if [ -f "$jar_file" ]; then
         filename=$(basename "$jar_file")
         target_file="/data/${filename}"
@@ -777,9 +777,9 @@ setup_server_symlinks() {
     done
   done
   
-  # Create symlinks for environment files
+  # Create symlinks for environment files from version-specific directory
   for pattern in "${ENV_FILE_PATTERNS[@]}"; do
-    for env_file in /opt/minecraft/server/${pattern}; do
+    for env_file in /opt/minecraft/server/${CURRENT_VERSION}/${pattern}; do
       if [ -f "$env_file" ]; then
         filename=$(basename "$env_file")
         target_file="/data/${filename}"
