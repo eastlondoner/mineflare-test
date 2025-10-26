@@ -896,6 +896,71 @@ if (clearUrlsBtn) {
   });
 }
 
+// Collapse/expand URLs panel functionality
+const urlsPanel = document.getElementById('detected-urls-panel');
+const collapseUrlsBtn = document.getElementById('collapse-urls-btn');
+const URLS_PANEL_STATE_KEY = 'mineflare-urls-panel-expanded';
+
+// Load saved panel state from localStorage (default to collapsed)
+const loadPanelState = (): boolean => {
+  const saved = localStorage.getItem(URLS_PANEL_STATE_KEY);
+  return saved === 'true'; // Default to false (collapsed) if not set
+};
+
+// Save panel state to localStorage
+const savePanelState = (expanded: boolean) => {
+  localStorage.setItem(URLS_PANEL_STATE_KEY, expanded.toString());
+};
+
+// Toggle panel expanded/collapsed state
+const togglePanelState = () => {
+  const isCurrentlyExpanded = urlsPanel?.classList.contains('expanded');
+  if (isCurrentlyExpanded) {
+    urlsPanel?.classList.remove('expanded');
+    urlsPanel?.classList.add('collapsed');
+    savePanelState(false);
+  } else {
+    urlsPanel?.classList.remove('collapsed');
+    urlsPanel?.classList.add('expanded');
+    savePanelState(true);
+  }
+};
+
+// Initialize panel state
+const initializePanelState = () => {
+  const isExpanded = loadPanelState();
+  if (urlsPanel) {
+    if (isExpanded) {
+      urlsPanel.classList.remove('collapsed');
+      urlsPanel.classList.add('expanded');
+    } else {
+      urlsPanel.classList.remove('expanded');
+      urlsPanel.classList.add('collapsed');
+    }
+  }
+};
+
+// Handle collapse button click (minimize)
+if (collapseUrlsBtn) {
+  collapseUrlsBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent panel click from interfering
+    togglePanelState();
+  });
+}
+
+// Handle clicking on collapsed panel (expand)
+if (urlsPanel) {
+  urlsPanel.addEventListener('click', (e) => {
+    // Only expand if panel is collapsed and click is on the panel itself (not a child element)
+    if (urlsPanel.classList.contains('collapsed')) {
+      togglePanelState();
+    }
+  });
+}
+
+// Initialize panel state on load
+initializePanelState();
+
 // Handle tab switching
 const tabs = document.querySelectorAll('.tab');
 const terminalWrappers = document.querySelectorAll('.terminal-wrapper');

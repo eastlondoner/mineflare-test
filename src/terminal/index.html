@@ -251,6 +251,11 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
+            z-index: 500;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #detected-urls-panel.expanded {
             width: 450px;
             max-height: 350px;
             background: linear-gradient(135deg, #0a1612 0%, #1a2e1e 50%, #2a1810 100%);
@@ -261,12 +266,139 @@
                 0 8px 32px rgba(0, 0, 0, 0.5),
                 0 0 0 1px rgba(87, 166, 78, 0.2),
                 inset 0 1px 0 rgba(87, 166, 78, 0.15);
-            z-index: 500;
             display: flex;
             flex-direction: column;
             backdrop-filter: blur(12px);
             overflow: hidden;
             animation: slideInFromBottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #detected-urls-panel.collapsed {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #55FF55 0%, #57A64E 100%);
+            border: none;
+            box-shadow: 0 4px 20px rgba(85, 255, 85, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            overflow: visible;
+            animation: idlePulse 4s ease-in-out infinite;
+        }
+
+        #detected-urls-panel.collapsed:hover {
+            transform: scale(1.15);
+            box-shadow: 0 8px 36px rgba(85, 255, 85, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.2);
+            filter: brightness(1.2);
+            animation: none;
+        }
+
+        @keyframes idlePulse {
+            0%, 100% {
+                transform: scale(1);
+                filter: brightness(1);
+            }
+            50% {
+                transform: scale(1.03);
+                filter: brightness(1.15);
+            }
+        }
+
+        /* Enchanted glint effect for collapsed state */
+        #detected-urls-panel.collapsed::before,
+        #detected-urls-panel.collapsed::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                transparent 40%,
+                rgba(255, 255, 255, 0.8) 50%,
+                transparent 60%,
+                transparent 100%
+            );
+            pointer-events: none;
+        }
+
+        #detected-urls-panel.collapsed::before {
+            animation: enchantedGlint 7s ease-in-out 0s infinite;
+        }
+
+        #detected-urls-panel.collapsed::after {
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                transparent 35%,
+                rgba(255, 255, 255, 0.4) 50%,
+                transparent 65%,
+                transparent 100%
+            );
+            animation: enchantedGlintSecondary 7s ease-in-out 0.5s infinite;
+        }
+
+        #detected-urls-panel.collapsed:hover::before,
+        #detected-urls-panel.collapsed:hover::after {
+            animation: none !important;
+        }
+
+        @keyframes enchantedGlint {
+            0% {
+                transform: translateX(-150%) translateY(-150%) rotate(45deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.8;
+            }
+            50% {
+                opacity: 0.6;
+            }
+            90% {
+                opacity: 0;
+            }
+            100% {
+                transform: translateX(150%) translateY(150%) rotate(45deg);
+                opacity: 0;
+            }
+        }
+
+        @keyframes enchantedGlintSecondary {
+            0% {
+                transform: translateX(-180%) translateY(-180%) rotate(45deg);
+                opacity: 0;
+            }
+            15% {
+                opacity: 0.5;
+            }
+            60% {
+                opacity: 0.3;
+            }
+            95% {
+                opacity: 0;
+            }
+            100% {
+                transform: translateX(180%) translateY(180%) rotate(45deg);
+                opacity: 0;
+            }
+        }
+
+        .collapsed-icon {
+            font-size: 1.5rem;
+            display: none;
+        }
+
+        #detected-urls-panel.collapsed .collapsed-icon {
+            display: block;
+        }
+
+        #detected-urls-panel.collapsed #detected-urls-header,
+        #detected-urls-panel.collapsed #detected-urls-list {
+            display: none;
         }
 
         @keyframes slideInFromBottom {
@@ -367,6 +499,12 @@
             text-transform: uppercase;
         }
 
+        #collapse-urls-btn {
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.15), rgba(255, 107, 107, 0.25));
+            border: 2px solid rgba(255, 107, 107, 0.3);
+            color: #ff6b6b;
+        }
+
         #refresh-urls-btn {
             background: linear-gradient(135deg, rgba(87, 166, 78, 0.15), rgba(87, 166, 78, 0.25));
             border: 2px solid rgba(87, 166, 78, 0.3);
@@ -414,8 +552,18 @@
             box-shadow: 0 4px 16px rgba(87, 166, 78, 0.4);
         }
 
+        #collapse-urls-btn::before {
+            background: rgba(255, 107, 107, 0.3);
+        }
+
         #clear-urls-btn::before {
             background: rgba(255, 107, 107, 0.3);
+        }
+
+        #collapse-urls-btn:hover {
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.25), rgba(255, 107, 107, 0.35));
+            border-color: rgba(255, 107, 107, 0.6);
+            box-shadow: 0 4px 16px rgba(255, 107, 107, 0.4);
         }
 
         #clear-urls-btn:hover {
@@ -577,9 +725,18 @@
 
         /* Responsive adjustments for smaller screens */
         @media (max-width: 768px) {
-            #detected-urls-panel {
+            #detected-urls-panel.expanded {
                 width: calc(100vw - 40px);
                 max-width: 450px;
+            }
+            
+            #detected-urls-panel.collapsed {
+                width: 50px;
+                height: 50px;
+            }
+            
+            .collapsed-icon {
+                font-size: 1.25rem;
             }
         }
     </style>
@@ -638,10 +795,12 @@
     </div>
 
     <!-- Detected URLs Panel -->
-    <div id="detected-urls-panel">
+    <div id="detected-urls-panel" class="collapsed">
+        <span class="collapsed-icon" title="Open Detected Links">🔗</span>
         <div id="detected-urls-header">
             <span class="panel-title">🔗 Detected Links</span>
             <div class="header-buttons">
+                <button id="collapse-urls-btn" class="panel-button" title="Minimize panel">−</button>
                 <button id="refresh-urls-btn" class="panel-button" title="Scan current terminal for URLs">🔄 Refresh</button>
                 <button id="clear-urls-btn" class="panel-button" title="Clear all URLs">Clear</button>
             </div>
