@@ -1,4 +1,4 @@
-import { backendUrl, fetchWithAuth } from '../client/utils/api';
+import { backendUrl, fetchApi } from '../client/utils/api';
 import { Terminal } from '@xterm/xterm';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 
@@ -334,11 +334,18 @@ async function openUrlInBrowser(url: string) {
     showStatus('Opening URL in browser...', 'connecting');
     
     // Call the browser navigation API
-    const response = await fetchWithAuth('/api/browser/navigate', {
+    const response = await fetchApi('/api/browser/navigate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
     });
+    
+    // Check for authentication failure
+    if (response.status === 401) {
+      console.log('Not authenticated, redirecting to root...');
+      window.location.href = '/';
+      return;
+    }
     
     if (!response.ok) {
       throw new Error(`Failed to navigate: ${response.statusText}`);
@@ -618,11 +625,18 @@ async function connect(type: ActualTerminalType) {
 
     try {
         // Fetch WebSocket token
-        const tokenResponse = await fetchWithAuth('/auth/ws-token', {
+        // Use fetchApi directly to avoid the reload loop from fetchWithAuth
+        const tokenResponse = await fetchApi('/auth/ws-token', {
             credentials: 'include',
         });
         if (!tokenResponse.ok) {
             console.error('Failed to get WebSocket token, status:', tokenResponse.status);
+            // On 401, redirect to root (login page) instead of reloading to avoid infinite loop
+            if (tokenResponse.status === 401) {
+                console.log('Not authenticated, redirecting to root...');
+                window.location.href = '/';
+                return;
+            }
       if (type === currentTerminal) {
             showStatus('Authentication failed', 'error');
       }

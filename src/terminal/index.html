@@ -285,26 +285,11 @@
             justify-content: center;
             cursor: pointer;
             overflow: hidden;
-            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-            animation: idlePulse 4s ease-in-out infinite;
+            transition: box-shadow 0.2s ease;
         }
 
         #detected-urls-panel.collapsed:hover {
-            transform: scale(1.02);
-            box-shadow: 0 4px 24px rgba(85, 255, 85, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.12);
-            filter: brightness(1.05);
-            animation: none;
-        }
-
-        @keyframes idlePulse {
-            0%, 100% {
-                transform: scale(1);
-                filter: brightness(1);
-            }
-            50% {
-                transform: scale(1.015);
-                filter: brightness(1.06);
-            }
+            box-shadow: 0 6px 24px rgba(85, 255, 85, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.15);
         }
 
         /* Enchanted glint effect for collapsed state */
