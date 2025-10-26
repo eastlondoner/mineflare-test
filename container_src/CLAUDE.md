@@ -32,7 +32,7 @@ You can run rcon-cli to interact with the server by sending commands. To view th
 
 ## mineflare Bot Controller
 
-The `mineflare` CLI is available at `/usr/local/bin/mineflare`. This is an AI-controlled Minecraft bot with HTTP API and CLI interface that can:
+The `mineflare` CLI is available at `/opt/mineflare` as a node package. You can run it with bun (node is not installed but bun is). This is an AI-controlled Minecraft bot with HTTP API and CLI interface that can:
 
 - **Join the Minecraft server** as a bot player and perform automated tasks
 - **HTTP API** - REST endpoints for AI agents to control the bot programmatically

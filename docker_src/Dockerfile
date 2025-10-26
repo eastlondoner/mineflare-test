@@ -125,6 +125,7 @@ RUN set -eux; \
     cd /opt/mineflare; \
     /opt/bun/bin/bun install --production; \
     /opt/bun/bin/bun link; \
+    chown -R 1000:1000 /opt/mineflare; \
     cd /; \
     rm -rf /tmp/*; \
     printf '#!/bin/sh\nexec /opt/bun/bin/bun run /opt/bun/scripts/http-proxy.ts "$@"\n' > /usr/local/bin/http-proxy; \
