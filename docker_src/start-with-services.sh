@@ -494,8 +494,8 @@ start_ttyd() {
         --interface 0.0.0.0 \
         --base-path /src/terminal/claude \
         -Q \
-        --session-width 160 \
-        --session-height 80 \
+        --session-width 140 \
+        --session-height 60 \
         --writable \
         --client-option fontSize=14 \
         --client-option "theme=$TTYD_THEME" \
@@ -517,8 +517,8 @@ start_ttyd() {
         --interface 0.0.0.0 \
         --base-path /src/terminal/codex \
         -Q \
-        --session-width 160 \
-        --session-height 80 \
+        --session-width 140 \
+        --session-height 60 \
         --writable \
         --client-option fontSize=14 \
         --client-option "theme=$TTYD_THEME" \
@@ -540,8 +540,8 @@ start_ttyd() {
         --interface 0.0.0.0 \
         --base-path /src/terminal/gemini \
         -Q \
-        --session-width 160 \
-        --session-height 80 \
+        --session-width 140 \
+        --session-height 60 \
         --writable \
         --client-option fontSize=14 \
         --client-option "theme=$TTYD_THEME" \
@@ -562,8 +562,8 @@ start_ttyd() {
         --interface 0.0.0.0 \
         --base-path /src/terminal/bash \
         -Q \
-        --session-width 160 \
-        --session-height 80 \
+        --session-width 140 \
+        --session-height 60 \
         --writable \
         --client-option fontSize=14 \
         --client-option "theme=$TTYD_THEME" \
