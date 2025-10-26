@@ -599,12 +599,31 @@ backup_on_shutdown() {
 kill_background_processes() {
   echo "Killing background processes..."
 
+  # Kill monitor process first
+  if [ -n "${MONITOR_PID:-}" ]; then
+    echo "Killing monitor loop (PID: $MONITOR_PID)..."
+    kill -KILL "$MONITOR_PID" 2>/dev/null || true
+  fi
+
   # Kill Minecraft process and its children
   if [ -n "${MINECRAFT_PID:-}" ]; then
     echo "Killing Minecraft server (PID: $MINECRAFT_PID) and its children..."
     # Kill the entire process group
     pkill -KILL -P "$MINECRAFT_PID" 2>/dev/null || true
     kill -KILL "$MINECRAFT_PID" 2>/dev/null || true
+  fi
+
+  # Kill hteetp process and its children
+  if [ -n "${HTEETP_PID:-}" ]; then
+    echo "Killing hteetp log server (PID: $HTEETP_PID) and its children..."
+    pkill -KILL -P "$HTEETP_PID" 2>/dev/null || true
+    kill -KILL "$HTEETP_PID" 2>/dev/null || true
+  fi
+
+  # Clean up the FIFO
+  if [ -n "${HTEETP_FIFO:-}" ] && [ -e "$HTEETP_FIFO" ]; then
+    echo "Removing FIFO: $HTEETP_FIFO"
+    rm -f "$HTEETP_FIFO" 2>/dev/null || true
   fi
 
   # Kill file server process and its children
@@ -963,13 +982,43 @@ write_status "Starting Minecraft server"
 # Set up SIGTERM trap
 trap handle_shutdown SIGTERM
 
-# Execute Minecraft in restart loop (background)
+# Start hteetp as a persistent service on port 8082
+# Uses a named pipe to decouple hteetp lifecycle from Minecraft server
+echo "Setting up persistent log server (hteetp) on port 8082..."
+HTEETP_FIFO="/tmp/minecraft-logs.fifo"
+rm -f "$HTEETP_FIFO"
+mkfifo "$HTEETP_FIFO"
+
+# Start hteetp in its own restart loop
 (
+  # Disable errexit in this subshell - we want infinite restarts
+  set +e
+  while true; do
+    echo "Starting hteetp log server on port 8082 (attempt at $(date))"
+    hteetp --host 0.0.0.0 --port 8082 --size 1M --text < "$HTEETP_FIFO"
+    HTEETP_EXIT=$?
+    echo "hteetp exited (code: $HTEETP_EXIT), restarting in 2 seconds..."
+    sleep 2
+  done
+) >> /logs/hteetp.log 2>&1 &
+HTEETP_PID=$!
+echo "hteetp log server started in background (PID: $HTEETP_PID), logging to /logs/hteetp.log"
+
+# Execute Minecraft in restart loop (background)
+# This loop runs independently of hteetp, preventing pipe failures from killing it
+(
+  # Disable errexit in this subshell - we want infinite restarts regardless of exit codes
+  set +e
+  
   while true; do
     echo "Starting Minecraft server (attempt at $(date))"
-    write_status "Minecraft server running"
-    "$@" | hteetp --host 0.0.0.0 --port 8082 --size 1M --text
+    write_status "Minecraft server starting"
+    
+    # Run server and tee output to both the FIFO (for hteetp) and stderr (for container logs)
+    # The || true ensures this command never causes the loop to exit
+    ( "$@" 2>&1 | tee "$HTEETP_FIFO" ) || true
     EXIT_CODE=$?
+    
     echo "Minecraft server exited (code: $EXIT_CODE), restarting in 2 seconds..."
     write_status "Minecraft server restarting"
     sleep 2
@@ -978,6 +1027,28 @@ trap handle_shutdown SIGTERM
 MINECRAFT_PID=$!
 
 echo "Minecraft server started in restart loop (PID: $MINECRAFT_PID)"
+
+# Monitor the restart loop to detect if it dies unexpectedly
+(
+  while true; do
+    # Check if Minecraft restart loop is still alive
+    if ! kill -0 "$MINECRAFT_PID" 2>/dev/null; then
+      echo "ERROR: Minecraft restart loop died (PID: $MINECRAFT_PID) - this should never happen!"
+      write_status "Minecraft restart loop FAILED"
+      # The loop died, which means something is seriously wrong
+      # Log the error but don't exit - let the container keep running so other services remain available
+    fi
+    
+    # Check if hteetp restart loop is still alive
+    if ! kill -0 "$HTEETP_PID" 2>/dev/null; then
+      echo "WARNING: hteetp restart loop died (PID: $HTEETP_PID)"
+      # hteetp loop died - less critical but should be logged
+    fi
+    
+    sleep 10
+  done
+) &
+MONITOR_PID=$!
 
 # Wait indefinitely for container shutdown signal
 wait
