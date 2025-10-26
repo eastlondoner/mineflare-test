@@ -6,6 +6,7 @@
 
 # Stage for Paper installation - install all supported versions
 FROM itzg/minecraft-server:latest AS paper-install
+
 RUN mkdir -p /opt/minecraft/server/1.21.7 && /usr/bin/mc-image-helper install-paper \
     --project=paper \
     --version=1.21.7 \
@@ -27,6 +28,16 @@ RUN mkdir -p /opt/minecraft/server/1.21.10 && /usr/bin/mc-image-helper install-p
 # Final stage - main image
 FROM itzg/minecraft-server:latest
 
+
+# Create temp directory for minecraft user outside /data (not backed up)
+# This fixes Bun's "unable to write files to tempdir" error
+RUN mkdir -p /var/tmp/minecraft && \
+    chown 1000:1000 /var/tmp/minecraft && \
+    chmod 1777 /var/tmp/minecraft
+
+ENV TMPDIR=/var/tmp/minecraft
+ENV BUN_TMPDIR=/var/tmp/minecraft
+
 # First we do a bunch of heavy lifting to install the dependencies for paper plugin development
 # this is first to maximize build caching
 COPY --chmod=755 setup-paper-dev.sh /tmp/setup-paper-dev.sh
@@ -46,17 +57,17 @@ RUN apt-get update \
         ripgrep \
     && curl -fsSL https://tailscale.com/install.sh | sh \
     && curl -fsSL https://bun.sh/install | bash && mv /root/.bun /opt/bun \
+    && wget -qO- https://github.com/novnc/websockify/archive/refs/tags/v0.11.0.tar.gz | tar xz -C /opt \
+    && mv /opt/websockify-0.11.0 /opt/websockify \
     && mkdir -p $(dirname "${TAILSCALE_STATE_DIR}") \
     && mkdir -p /data/plugins \
     && echo "minecraft ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/minecraft \
     && chmod 0440 /etc/sudoers.d/minecraft \
     && chown -R 1000:1000 /opt/bun \
     && bash /tmp/setup-paper-dev.sh \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/tmp/minecraft/*
 
-# Install websockify (required by noVNC for VNC-to-WebSocket proxy)
-RUN wget -qO- https://github.com/novnc/websockify/archive/refs/tags/v0.11.0.tar.gz | tar xz -C /opt \
-    && mv /opt/websockify-0.11.0 /opt/websockify
 
 ENV BUN_INSTALL=/opt/bun
 ENV TAILSCALE_STATE_DIR=/var/lib/tailscale/tailscaled.state
@@ -131,7 +142,8 @@ RUN set -eux; \
     printf '#!/bin/sh\nexec /opt/bun/bin/bun run /opt/bun/scripts/http-proxy.ts "$@"\n' > /usr/local/bin/http-proxy; \
     printf '#!/bin/sh\nexec /opt/bun/bin/bun run /opt/bun/scripts/file-server.ts "$@"\n' > /usr/local/bin/file-server; \
     printf '#!/bin/sh\nexec /opt/bun/bin/bun run /opt/bun/scripts/gemini.js "$@"\n' > /usr/local/bin/gemini; \
-    chmod +x /usr/local/bin/http-proxy /usr/local/bin/file-server /usr/local/bin/gemini
+    chmod +x /usr/local/bin/http-proxy /usr/local/bin/file-server /usr/local/bin/gemini; \
+    rm -rf /var/tmp/minecraft/*;
 
 # Fetch latest mineflare-cli README and place in /docs for AI agent reference
 RUN mkdir -p /docs/mineflare-cli \
