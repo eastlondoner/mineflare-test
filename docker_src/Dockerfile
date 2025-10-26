@@ -69,7 +69,7 @@ RUN apt-get update \
     && rm -rf /var/tmp/minecraft/*
 
 
-ENV BUN_INSTALL=/opt/bun
+ENV BUN_INSTALL=/data/.bun
 ENV TAILSCALE_STATE_DIR=/var/lib/tailscale/tailscaled.state
 ENV SERVER_PORT=25565
 ENV TYPE=PAPER
