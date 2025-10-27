@@ -30,6 +30,70 @@ Most things you need are in the /data directory.
 
 You can run rcon-cli to interact with the server by sending commands. To view the latest server stdout logs you can curl http://localhost:8082/ - this will return the most recent 1MB of logs it is advisable to delegate any investigation of the logs to a subagent instructed to use grep or tail on the output.
 
+## File Server and Backup System
+
+The container runs a file server on **port 8083** (`/opt/bun/scripts/file-server.ts`) that provides:
+
+- **File serving** from the container filesystem
+- **Backup to R2** - Create tar.gz archives and upload to Cloudflare R2
+- **Restore from R2** - Download and extract backups
+- **List backups** - View available backups for a directory
+
+### CRITICAL: Valid Backup Paths
+
+**⚠️ ONLY backups from paths under `data/` will be restored on container restart.**
+
+- ✅ Valid: `data/mineflare-cli`, `data/plugins`, `data/world`, `data/config`, etc.
+- ❌ Invalid: Any path outside `data/` (e.g., `/opt/`, `/tmp/`, `/root/`)
+
+Backups of directories outside `data/` will be created but **will NOT be automatically restored** when the container restarts. Only backup paths that need to persist across container restarts.
+
+### Triggering Backups
+
+**Synchronous backup** (blocks until complete):
+```bash
+curl "http://localhost:8083/<directory_path>?backup=true"
+```
+
+**Background backup** (returns immediately, recommended for large directories):
+```bash
+# Start the backup
+BACKUP_ID="backup_$(date +%s)"
+curl "http://localhost:8083/<directory_path>?backup=true&backup_id=${BACKUP_ID}"
+
+# Check status later
+curl "http://localhost:8083/backup-status?id=${BACKUP_ID}" | jq .
+```
+
+**Examples**:
+```bash
+# Backup data directory (synchronous)
+curl "http://localhost:8083/data?backup=true" | jq .
+
+# Backup data directory (background)
+BACKUP_ID="plugins_backup_$(date +%s)"
+curl "http://localhost:8083/data?backup=true&backup_id=${BACKUP_ID}" | jq .
+curl "http://localhost:8083/backup-status?id=${BACKUP_ID}" | jq .
+```
+
+### Restoring Backups
+
+```bash
+# List available backups for a directory
+curl "http://localhost:8083/data/mineflare-cli?list_backups=true" | jq .
+
+# Restore from a specific backup
+curl "http://localhost:8083/data/mineflare-cli?restore=backups/3129840336_2025102623_data.tar.gz" | jq .
+```
+
+### Backup Details
+
+- Backups are stored in R2 with reverse-epoch timestamps for newest-first ordering
+- Format: `backups/<reverse_epoch>_<YYYYMMDDHH>_<dirname>.tar.gz`
+- Excludes `./logs` and `./cache` directories automatically
+- Large files (>100 MB) use multipart downloads with retry logic
+- **Important**: Only backup `/data/` the auto restore functonality expects this
+
 ## mineflare Bot Controller
 
 The `mineflare` CLI is available at `/opt/mineflare` as a node package. You can run it with bun (node is not installed but bun is). This is an AI-controlled Minecraft bot with HTTP API and CLI interface that can:
