@@ -696,6 +696,13 @@ kill_background_processes() {
   echo "Background processes terminated"
 }
 
+close_hteetp_fifo_guard() {
+  if [ -n "${HTEETP_FIFO_GUARD_FD:-}" ]; then
+    eval "exec ${HTEETP_FIFO_GUARD_FD}>&-"
+    unset HTEETP_FIFO_GUARD_FD
+  fi
+}
+
 handle_shutdown() {
   echo "Received SIGTERM, initiating graceful shutdown..."
   
@@ -727,6 +734,9 @@ handle_shutdown() {
   # Kill all background processes
   kill_background_processes
   
+  # Close FIFO guard descriptor before exiting
+  close_hteetp_fifo_guard
+
   # Exit
   echo "Shutdown complete"
   exit 0
@@ -980,6 +990,9 @@ echo "Command: $@"
 
 write_status "Starting Minecraft server"
 
+# Close FIFO guard on any shell exit
+trap close_hteetp_fifo_guard EXIT
+
 # Set up SIGTERM trap
 trap handle_shutdown SIGTERM
 
@@ -989,6 +1002,9 @@ echo "Setting up persistent log server (hteetp) on port 8082..."
 HTEETP_FIFO="/tmp/minecraft-logs.fifo"
 rm -f "$HTEETP_FIFO"
 mkfifo "$HTEETP_FIFO"
+
+# Keep the FIFO open on both ends to avoid writer/reader races during restarts
+exec {HTEETP_FIFO_GUARD_FD}<>"$HTEETP_FIFO"
 
 # Start hteetp in its own restart loop
 (
@@ -1017,10 +1033,9 @@ echo "hteetp log server started in background (PID: $HTEETP_PID), logging to /lo
     
     # Run server and tee output to both the FIFO (for hteetp) and container logs
     # Explicitly redirect tee stdout so container STDOUT captures the stream
-    # The || true ensures this command never causes the loop to exit
     (
       "$@" 2>&1 | tee "$HTEETP_FIFO"
-    ) 2>&1 || true
+    ) 2>&1
     EXIT_CODE=$?
     
     echo "Minecraft server exited (code: $EXIT_CODE), restarting in 2 seconds..."
