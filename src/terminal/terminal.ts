@@ -647,7 +647,7 @@ async function connect(type: ActualTerminalType) {
 
         // Determine WebSocket protocol (ws or wss)
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const backend = new URL(backendUrl(`/src/terminal/${type}/ws`));
+    const backend = backendUrl(`/src/terminal/${type}/ws`);
         backend.protocol = protocol;
         
         // Add token as query parameter
