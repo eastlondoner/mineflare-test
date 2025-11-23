@@ -249,7 +249,7 @@ start_cloudflared() {
   (
     while true; do
       echo "Starting cloudflared tunnel run (attempt at $(date))"
-      cloudflared tunnel run --token --protocol http2 "$TOKEN"
+      cloudflared tunnel run --protocol http2 --token "$TOKEN"
       EXIT_CODE=$?
       echo "cloudflared tunnel exited (code: $EXIT_CODE), restarting in 5 seconds..."
       sleep 5

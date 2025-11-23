@@ -7,6 +7,9 @@ ENV XDG_DATA_HOME=/data/.local
 ENV XDG_CONFIG_HOME=/data/.config
 ENV XDG_CACHE_HOME=/data/.cache
 
+# Set a default password for the minecraft user so SSH sessions can authenticate
+RUN echo "minecraft:minecraft" | chpasswd
+
 USER 1000:1000
 
 # Create symlink from /home/minecraft to /data and set HOME - note this is NOT creating a circular reference
