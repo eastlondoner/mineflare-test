@@ -204,6 +204,33 @@ start_tailscale() {
   fi
 }
 
+start_cloudflared() {
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    echo "Skipping cloudflared tunnel (binary not found)"
+    return
+  fi
+
+  local TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
+  if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+    echo "Skipping cloudflared tunnel (no CLOUDFLARE_TUNNEL_TOKEN provided)"
+    return
+  fi
+
+  local LOG_FILE="/logs/cloudflared.log"
+
+  (
+    while true; do
+      echo "Starting cloudflared tunnel run (attempt at $(date))"
+      cloudflared tunnel run --token "$TOKEN"
+      EXIT_CODE=$?
+      echo "cloudflared tunnel exited (code: $EXIT_CODE), restarting in 5 seconds..."
+      sleep 5
+    done
+  ) >> "$LOG_FILE" 2>&1 &
+  CLOUDFLARED_PID=$!
+  echo "cloudflared tunnel started in background (PID: $CLOUDFLARED_PID), logging to $LOG_FILE"
+}
+
 configure_dynmap() {
   if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${DYNMAP_BUCKET:-}" ]; then
     echo "Skipping Dynmap S3 configuration (no R2 credentials found)"
@@ -693,6 +720,12 @@ kill_background_processes() {
     kill -KILL "$XVFB_PID" 2>/dev/null || true
   fi
 
+  if [ -n "${CLOUDFLARED_PID:-}" ]; then
+    echo "Killing cloudflared tunnel (PID: $CLOUDFLARED_PID) and its children..."
+    pkill -KILL -P "$CLOUDFLARED_PID" 2>/dev/null || true
+    kill -KILL "$CLOUDFLARED_PID" 2>/dev/null || true
+  fi
+
   echo "Background processes terminated"
 }
 
@@ -944,6 +977,9 @@ start_http_proxy
 
 # Start Tailscale in background if it's enabled
 start_tailscale &
+
+# Start cloudflared tunnel if configured
+start_cloudflared
 
 # Restore from backups before starting Minecraft server
 write_status "Checking for backups to restore"

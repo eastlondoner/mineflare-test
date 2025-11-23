@@ -42,8 +42,12 @@ ENV BUN_TMPDIR=/var/tmp/minecraft
 # this is first to maximize build caching
 COPY --chmod=755 setup-paper-dev.sh /tmp/setup-paper-dev.sh
 
-RUN apt-get update \
+RUN mkdir -p --mode=0755 /usr/share/keyrings && \
+    curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg | sudo tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null && \
+    echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list && \
+    apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        cloudflared \
         curl \
         ca-certificates \
         sudo \

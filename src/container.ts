@@ -142,6 +142,7 @@ export class MinecraftContainer extends Container {
         // Bucket for world data backups (uses same bucket as Dynmap by default)
         DATA_BUCKET_NAME: (this.env as Env).DATA_BUCKET_NAME || (this.env as Env).DYNMAP_BUCKET_NAME,
         OPTIONAL_PLUGINS: this.pluginFilenamesToEnable.join(" "), // space separated for consumption by bash script start-with-services.sh
+        CLOUDFLARE_TUNNEL_TOKEN: (this.env as Env).CLOUDFLARE_TUNNEL_TOKEN ?? "",
     };
     
   

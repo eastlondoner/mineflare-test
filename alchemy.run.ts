@@ -24,6 +24,25 @@ const app = await alchemy(name, {
 const baseDockerfile = await Bun.file("docker_src/.BASE_DOCKERFILE").text();
 
 console.log(`Base Dockerfile: ${baseDockerfile}`);
+
+const prodTunnel = await Tunnel("mineflare-prod-tunnel", {
+  name: `${app.name}-prod`,
+  adopt: true,
+  warpRouting: {
+    enabled: true,
+  },
+  ingress: [
+    { 
+      service: "ssh://localhost:22",
+      originRequest:
+      {
+        noTLSVerify: true
+      },
+    },
+    { service: "http_status:404" }
+  ]
+});
+
 export const containerPromise = Container<MinecraftContainer>("container3", {
   name: `${app.name}-container`,
   className: "MinecraftContainer",
@@ -158,7 +177,10 @@ const bindings =  {
   
   // Dynmap worker URL for iframe embedding
   DYNMAP_WORKER_URL: dynmapWorker.url ?? "",
+
+  CLOUDFLARE_TUNNEL_TOKEN: prodTunnel.token.unencrypted,
 } as const;
+
 export const worker: BunSPA<typeof bindings> = await BunSPA("mineflare-main-worker", {
   name: app.name,
   entrypoint: "src/worker.ts",

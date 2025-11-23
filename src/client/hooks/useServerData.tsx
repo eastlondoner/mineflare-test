@@ -4,6 +4,10 @@ import { fetchWithAuth } from '../utils/api';
 
 type ServerState = 'stopped' | 'starting' | 'running' | 'stopping';
 
+const MAX_POLL_DURATION_MS = 120_000; // Avoid hanging forever on a single request
+const STARTING_MAX_CONCURRENT_POLLS = 3; // Allow a few concurrent polls while starting
+const DEFAULT_MAX_CONCURRENT_POLLS = 1;
+
 export function useServerData(isAuthenticated: boolean) {
   const [status, setStatus] = useState<ServerStatus | null>(null);
   const [players, setPlayers] = useState<string[]>([]);
@@ -23,6 +27,7 @@ export function useServerData(isAuthenticated: boolean) {
   
   // Track active fetch calls for concurrency safety
   const activeFetches = useRef<Set<Promise<any>>>(new Set());
+  const pollStartTimes = useRef<Map<Promise<any>, number>>(new Map());
   const shouldFetchFullData = useRef(false);
 
   // Unified polling function that handles all states
@@ -144,11 +149,14 @@ export function useServerData(isAuthenticated: boolean) {
       }
     })();
 
+    const startedAt = Date.now();
     activeFetches.current.add(fetchPromise);
+    pollStartTimes.current.set(fetchPromise, startedAt);
     try {
       await fetchPromise;
     } finally {
       activeFetches.current.delete(fetchPromise);
+      pollStartTimes.current.delete(fetchPromise);
     }
   }, [serverState]);
 
@@ -283,10 +291,29 @@ export function useServerData(isAuthenticated: boolean) {
     fetchPlugins();
     fetchVersion();
 
+    const pruneStalePolls = () => {
+      if (activeFetches.current.size === 0) {
+        return;
+      }
+      const now = Date.now();
+      for (const fetchPromise of Array.from(activeFetches.current)) {
+        const startedAt = pollStartTimes.current.get(fetchPromise);
+        if (startedAt && now - startedAt > MAX_POLL_DURATION_MS) {
+          console.warn(`Clearing stale poll after ${now - startedAt}ms`);
+          activeFetches.current.delete(fetchPromise);
+          pollStartTimes.current.delete(fetchPromise);
+        }
+      }
+    };
+
     // Set up single unified polling interval
     const pollInterval = setInterval(() => {
-      // Only start a new poll if there are no active fetches
-      if (activeFetches.current.size === 0) {
+      pruneStalePolls();
+      const maxConcurrentPolls = serverState === 'starting'
+        ? STARTING_MAX_CONCURRENT_POLLS
+        : DEFAULT_MAX_CONCURRENT_POLLS;
+
+      if (activeFetches.current.size < maxConcurrentPolls) {
         poll();
       }
     }, 5000);
@@ -294,7 +321,7 @@ export function useServerData(isAuthenticated: boolean) {
     return () => {
       clearInterval(pollInterval);
     };
-  }, [isAuthenticated, poll, fetchPlugins, fetchVersion]);
+  }, [isAuthenticated, poll, fetchPlugins, fetchVersion, serverState]);
 
   return {
     status,
