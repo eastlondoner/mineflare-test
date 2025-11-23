@@ -59,11 +59,14 @@ RUN mkdir -p --mode=0755 /usr/share/keyrings && \
         x11-utils \
         xdotool \
         ripgrep \
+        openssh-server \
     && curl -fsSL https://tailscale.com/install.sh | sh \
     && curl -fsSL https://bun.sh/install | bash && mv /root/.bun /opt/bun \
     && wget -qO- https://github.com/novnc/websockify/archive/refs/tags/v0.11.0.tar.gz | tar xz -C /opt \
     && mv /opt/websockify-0.11.0 /opt/websockify \
     && mkdir -p $(dirname "${TAILSCALE_STATE_DIR}") \
+    && mkdir -p /var/run/sshd \
+    && chmod 755 /var/run/sshd \
     && mkdir -p /data/plugins \
     && echo "minecraft ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/minecraft \
     && chmod 0440 /etc/sudoers.d/minecraft \

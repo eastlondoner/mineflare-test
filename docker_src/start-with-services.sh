@@ -204,6 +204,34 @@ start_tailscale() {
   fi
 }
 
+start_sshd() {
+  if ! command -v sshd >/dev/null 2>&1; then
+    echo "Skipping sshd (binary not found)"
+    return
+  fi
+  
+  if [ -n "${SSHD_PID:-}" ] && kill -0 "$SSHD_PID" 2>/dev/null; then
+    echo "sshd is already running (PID: $SSHD_PID)"
+    return
+  fi
+
+  local LOG_FILE="/logs/sshd.log"
+  sudo mkdir -p /var/run/sshd
+  sudo chmod 755 /var/run/sshd
+
+  (
+    while true; do
+      echo "Starting sshd (attempt at $(date))"
+      sudo /usr/sbin/sshd -D -e
+      EXIT_CODE=$?
+      echo "sshd exited (code: $EXIT_CODE), restarting in 5 seconds..."
+      sleep 5
+    done
+  ) >> "$LOG_FILE" 2>&1 &
+  SSHD_PID=$!
+  echo "sshd started in background (PID: $SSHD_PID), logging to $LOG_FILE"
+}
+
 start_cloudflared() {
   if ! command -v cloudflared >/dev/null 2>&1; then
     echo "Skipping cloudflared tunnel (binary not found)"
@@ -229,6 +257,9 @@ start_cloudflared() {
   ) >> "$LOG_FILE" 2>&1 &
   CLOUDFLARED_PID=$!
   echo "cloudflared tunnel started in background (PID: $CLOUDFLARED_PID), logging to $LOG_FILE"
+
+  # Ensure sshd is running so the tunnel can forward SSH connections
+  start_sshd
 }
 
 configure_dynmap() {
@@ -718,6 +749,12 @@ kill_background_processes() {
     echo "Killing Xvfb (PID: $XVFB_PID) and its children..."
     pkill -KILL -P "$XVFB_PID" 2>/dev/null || true
     kill -KILL "$XVFB_PID" 2>/dev/null || true
+  fi
+
+  if [ -n "${SSHD_PID:-}" ]; then
+    echo "Killing sshd (PID: $SSHD_PID) and its children..."
+    pkill -KILL -P "$SSHD_PID" 2>/dev/null || true
+    kill -KILL "$SSHD_PID" 2>/dev/null || true
   fi
 
   if [ -n "${CLOUDFLARED_PID:-}" ]; then

@@ -38,8 +38,7 @@ const prodTunnel = await Tunnel("mineflare-prod-tunnel", {
       {
         noTLSVerify: true
       },
-    },
-    { service: "http_status:404" }
+    }
   ]
 });
 
