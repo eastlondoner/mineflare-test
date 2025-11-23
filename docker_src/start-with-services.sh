@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-export BUN_INSTALL=/data/.bun
+export BUN_INSTALL=/opt/bun
 # ============================================================================
 # Mineflare Container Service Manager
 # ============================================================================
@@ -65,8 +65,8 @@ write_status() {
 ensure_version_specific_plugins() {
   echo "Ensuring version-specific plugins are correctly linked..."
   
-  # Get current Minecraft version from environment
-  CURRENT_VERSION="${VERSION:-1.21.10}"
+  # Get current Minecraft version from environment (default matches Dockerfile)
+  CURRENT_VERSION="${VERSION:-1.21.8}"
   echo "Current Minecraft version: $CURRENT_VERSION"
   
   # Define version-specific plugins and their patterns
@@ -745,8 +745,8 @@ handle_shutdown() {
 setup_server_symlinks() {
   echo "Setting up server jar symlinks..."
   
-  # Get current Minecraft version from environment
-  CURRENT_VERSION="${VERSION:-1.21.10}"
+  # Get current Minecraft version from environment (default matches Dockerfile)
+  CURRENT_VERSION="${VERSION:-1.21.8}"
   echo "Current Minecraft version: $CURRENT_VERSION"
   
   # Define server jar patterns to symlink

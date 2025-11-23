@@ -9,7 +9,7 @@ import { AsyncLocalStorage } from "async_hooks";
 
 
 const env = workerEnv as typeof worker.Env;
-const singletonContainerId = "cf-singleton-container";
+export const DEFAULT_CONTAINER_ID = "cf-singleton-container";
 
 export const asyncLocalStorage = new AsyncLocalStorage<{ 
     cf: CfProperties | undefined;
@@ -20,13 +20,13 @@ export const asyncLocalStorage = new AsyncLocalStorage<{
  * Get the current container ID from async local storage, or return the default singleton ID
  */
 export function getCurrentContainerId(): string {
-    return asyncLocalStorage.getStore()?.containerId ?? singletonContainerId;
+    return asyncLocalStorage.getStore()?.containerId ?? DEFAULT_CONTAINER_ID;
 }
 
 export function getMinecraftContainer() {
     const store = asyncLocalStorage.getStore();
     const cf = store?.cf;
-    const containerId = store?.containerId ?? singletonContainerId;
+    const containerId = store?.containerId ?? DEFAULT_CONTAINER_ID;
     
     if(!cf) {
         const id = env.MINECRAFT_CONTAINER.idFromName(containerId);

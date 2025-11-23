@@ -4,10 +4,94 @@ import { CloudflareAdapter } from 'elysia/adapter/cloudflare-worker'
 import { env as workerEnv } from 'cloudflare:workers'
 import cors from "@elysiajs/cors";
 import { getNodeEnv } from "./client/utils/node-env";
-import { asyncLocalStorage, getMinecraftContainer } from "./server/get-minecraft-container";
+import { asyncLocalStorage, getMinecraftContainer, DEFAULT_CONTAINER_ID } from "./server/get-minecraft-container";
 import { authApp, requireAuth, decryptToken, getSymKeyCached } from "./server/auth";
 
 const env = workerEnv as typeof worker.Env;
+const CONTAINER_ID_HEADERS = ["x-mineflare-container-id", "x-container-id"] as const;
+const CONTAINER_ID_QUERY_KEYS = ["containerId", "container_id", "container"] as const;
+const CONTAINER_ID_PATH_PREFIX = "/containers/";
+const CONTAINER_ID_PATTERN = /^[A-Za-z0-9._:@-]{1,128}$/;
+
+function resolveRequestedContainerId(request: Request, parsedUrl?: URL): string {
+  const headerId = getContainerIdFromHeaders(request);
+  if (headerId) {
+    return headerId;
+  }
+
+  const url = parsedUrl ?? new URL(request.url);
+
+  const pathId = getContainerIdFromPath(url);
+  if (pathId) {
+    return pathId;
+  }
+
+  const queryId = getContainerIdFromQuery(url);
+  if (queryId) {
+    return queryId;
+  }
+
+  return DEFAULT_CONTAINER_ID;
+}
+
+function getContainerIdFromHeaders(request: Request): string | null {
+  for (const headerName of CONTAINER_ID_HEADERS) {
+    const headerValue = request.headers.get(headerName);
+    const normalized = normalizeContainerId(headerValue);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return null;
+}
+
+function getContainerIdFromQuery(url: URL): string | null {
+  for (const key of CONTAINER_ID_QUERY_KEYS) {
+    const value = url.searchParams.get(key);
+    const normalized = normalizeContainerId(value);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return null;
+}
+
+function getContainerIdFromPath(url: URL): string | null {
+  if (!url.pathname.startsWith(CONTAINER_ID_PATH_PREFIX)) {
+    return null;
+  }
+  const remainder = url.pathname.slice(CONTAINER_ID_PATH_PREFIX.length);
+  if (!remainder) {
+    return null;
+  }
+  const [rawSegment] = remainder.split("/");
+  if (!rawSegment) {
+    return null;
+  }
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(rawSegment);
+  } catch {
+    console.warn("Received malformed container ID path segment");
+    return null;
+  }
+  return normalizeContainerId(decoded);
+}
+
+function normalizeContainerId(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 128) {
+    return null;
+  }
+  if (!CONTAINER_ID_PATTERN.test(trimmed)) {
+    console.warn("Ignoring containerId with invalid characters");
+    return null;
+  }
+  return trimmed;
+}
 
 
   // Create Elysia app with proper typing for Cloudflare Workers
@@ -466,9 +550,8 @@ export default {
   async fetch(request: Request, _env: typeof worker.Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // TODO: Extract container ID from request path/headers for multi-container support
-    // For now, use the default singleton container ID
-    const containerId = "cf-singleton-container";
+    // Resolve the container ID for this request (header, query param, or fallback singleton)
+    const containerId = resolveRequestedContainerId(request, url);
 
     return asyncLocalStorage.run({ cf: request.cf, containerId }, async () => {
       // auth methods do not require auth - but browser/terminal HTML pages DO require auth

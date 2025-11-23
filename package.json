@@ -15,7 +15,8 @@
     "deploy": "touch .env && NODE_ENV=production alchemy deploy --env-file .env",
     "destroy": "touch .env && NODE_ENV=production alchemy destroy --env-file .env",
     "dev": "touch .env && NODE_ENV=development alchemy dev --env-file .env",
-    "dev:spa": "vite"
+    "dev:spa": "vite",
+    "logs:cf-build": "bun scripts/get-workers-build-logs.mjs"
   },
   "devDependencies": {
     "@cloudflare/containers": "^0.0.28",
