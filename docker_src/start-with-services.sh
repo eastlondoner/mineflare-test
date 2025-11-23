@@ -1015,9 +1015,12 @@ echo "hteetp log server started in background (PID: $HTEETP_PID), logging to /lo
     echo "Starting Minecraft server (attempt at $(date))"
     write_status "Minecraft server starting"
     
-    # Run server and tee output to both the FIFO (for hteetp) and stderr (for container logs)
+    # Run server and tee output to both the FIFO (for hteetp) and container logs
+    # Explicitly redirect tee stdout so container STDOUT captures the stream
     # The || true ensures this command never causes the loop to exit
-    ( "$@" 2>&1 | tee "$HTEETP_FIFO" ) || true
+    (
+      "$@" 2>&1 | tee "$HTEETP_FIFO"
+    ) 2>&1 || true
     EXIT_CODE=$?
     
     echo "Minecraft server exited (code: $EXIT_CODE), restarting in 2 seconds..."
