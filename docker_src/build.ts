@@ -7,11 +7,15 @@ import { join } from "path";
 
 // This script builds and pushes the docker image to the cloudflare container registry
 
-const REPO = process.env.BASE_DOCKERFILE ?? "andrewjefferson/mineflare-base"
-const PLATFORMS = process.env.DOCKER_PLATFORMS ?? "linux/amd64,linux/arm64"
-let skipPush = process.env.SKIP_PUSH ?.toLowerCase() === "true"
+const REPO = process.env.BASE_DOCKERFILE ?? "andrewjefferson/mineflare-base";
+const PLATFORMS = process.env.DOCKER_PLATFORMS ?? "linux/amd64,linux/arm64";
+const BUILDX_BUILDER_NAME = process.env.DOCKER_BUILDX_BUILDER ?? "mineflare-buildx-stargz";
+const BUILDKIT_IMAGE = process.env.BUILDKIT_IMAGE ?? "moby/buildkit:buildx-stable-1";
+const BUILDKITD_FLAGS = process.env.BUILDKITD_FLAGS ?? "--oci-worker-snapshotter=stargz";
+const ESTARGZ_OUTPUT = "type=registry,oci-mediatypes=true,compression=estargz,force-compression=true,push=true";
+let skipPush = process.env.SKIP_PUSH ?.toLowerCase() === "true";
 if(!skipPush && process.env.CI) {
-    skipPush = true
+    skipPush = true;
 }
 
 // change cwd to the directory of the script
@@ -27,12 +31,12 @@ if(existsSync(".BASE_DOCKERFILE") && process.env.CI) {
 // Ensure buildx builder exists and is using it
 console.log("Setting up Docker buildx...");
 try {
-    await $`docker buildx use multiarch-builder`;
-    console.log("Using existing buildx builder");
+    await $`docker buildx use ${BUILDX_BUILDER_NAME}`;
+    console.log(`Using existing buildx builder "${BUILDX_BUILDER_NAME}"`);
 } catch {
     // Builder doesn't exist, create it
-    await $`docker buildx create --name multiarch-builder --use`;
-    console.log("Created new buildx builder");
+    await $`docker buildx create --name ${BUILDX_BUILDER_NAME} --driver docker-container --use --driver-opt image=${BUILDKIT_IMAGE} --buildkitd-flags ${BUILDKITD_FLAGS}`;
+    console.log(`Created new buildx builder "${BUILDX_BUILDER_NAME}" with stargz snapshotter support`);
 }
 
 // Compute and cache the build state for build-container-services.sh
@@ -172,10 +176,10 @@ if (!imageExists) {
     console.log(`Building multi-arch image ${tag} for platforms: ${PLATFORMS}...`);
     
     // Check if we can use the cache by verifying if the image exists remotely
-    let cacheFromFlag = "";
+let cacheFromFlag = "";
     try {
         await $`docker manifest inspect ${tag}`.quiet();
-        cacheFromFlag = `--cache-from type=registry,ref=${tag}`;
+        cacheFromFlag = `--cache-from=type=registry,ref=${tag}`;
         console.log(`✓ Found cache image ${tag}, will use for build optimization`);
     } catch (cacheError) {
         console.log(`Cache image ${tag} not found, building without cache`);
@@ -183,14 +187,14 @@ if (!imageExists) {
     
     // Build the image with or without cache based on availability
     if (skipPush) {
-        await $`docker buildx build --platform ${PLATFORMS} ${cacheFromFlag} --progress=plain --output type=cacheonly -t ${tag} -t ${latestTag} .`
+        await $`docker buildx build --platform ${PLATFORMS} ${cacheFromFlag} --progress=plain --output=type=cacheonly -t ${tag} -t ${latestTag} .`
             .catch((error) => {
                 console.error(error)
                 console.error(`Failed to build multi-version container image`)
                 process.exit(1)
             })
     } else {
-        await $`docker buildx build --platform ${PLATFORMS} ${cacheFromFlag} --progress=plain --push -t ${tag} -t ${latestTag} .`
+        await $`docker buildx build --platform ${PLATFORMS} ${cacheFromFlag} --progress=plain --output=${ESTARGZ_OUTPUT} -t ${tag} -t ${latestTag} .`
             .catch((error) => {
                 console.error(error)
                 console.error(`Failed to build multi-version container image`)

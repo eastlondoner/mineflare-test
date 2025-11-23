@@ -25,22 +25,26 @@ const baseDockerfile = await Bun.file("docker_src/.BASE_DOCKERFILE").text();
 
 console.log(`Base Dockerfile: ${baseDockerfile}`);
 
-const prodTunnel = await Tunnel("mineflare-prod-tunnel", {
-  name: `${app.name}-prod`,
-  adopt: true,
-  warpRouting: {
-    enabled: true,
-  },
-  ingress: [
-    { 
-      service: "ssh://localhost:22",
-      originRequest:
+let tunnelToken = process.env.CLOUDFLARE_TUNNEL_TOKEN ?? "";
+if(!tunnelToken) {
+  const prodTunnel = await Tunnel("mineflare-prod-tunnel", {
+    name: `${app.name}-prod`,
+    adopt: true,
+    warpRouting: {
+      enabled: true,
+    },
+    ingress: [
       {
-        noTLSVerify: true
-      },
-    }
-  ]
-});
+        service: "ssh://localhost:22",
+        originRequest:
+        {
+          noTLSVerify: true
+        },
+      }
+    ]
+  });
+  tunnelToken = prodTunnel.token.unencrypted;
+}
 
 export const containerPromise = Container<MinecraftContainer>("container3", {
   name: `${app.name}-container`,
@@ -177,7 +181,7 @@ const bindings =  {
   // Dynmap worker URL for iframe embedding
   DYNMAP_WORKER_URL: dynmapWorker.url ?? "",
 
-  CLOUDFLARE_TUNNEL_TOKEN: prodTunnel.token.unencrypted,
+  CLOUDFLARE_TUNNEL_TOKEN: tunnelToken,
 } as const;
 
 export const worker: BunSPA<typeof bindings> = await BunSPA("mineflare-main-worker", {

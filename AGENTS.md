@@ -48,3 +48,4 @@ graph TB
 - **Container debugging**: Use `/error` endpoint to test error handling, check container logs via Alchemy dashboard
 - **Environment variables**: Add to MinecraftContainer.envVars for container-level config, or worker bindings in alchemy.run.ts for worker-level config
 - **Tailscale configuration**: Modify TS_* environment variables in MinecraftContainer.envVars or update start-with-services.sh script
+- **Container image builds**: `bun run build` now provisions a `mineflare-buildx-stargz` Buildx builder and pushes images with eStargz compression for faster cold starts; rerun the script if the builder goes missing.

@@ -31,7 +31,7 @@ Mineflare is a Cloudflare-based Minecraft server hosting platform that combines 
 
 ### Container
 - `./docker_src/build-container-services.sh` - Manually rebuild the Bun-based HTTP proxy and file-server binaries (normally invoked by `bun run dev`).
-- `bun ./docker_src/build.ts` - Build a single multi-version container image that includes all supported Paper versions (1.21.7, 1.21.8, 1.21.10) with architecture-specific binaries for amd64 and arm64. Uses Docker buildx for multi-platform builds and caches results to `.BASE_DOCKERFILE`.
+- `bun ./docker_src/build.ts` - Build a single multi-version container image that includes all supported Paper versions (1.21.7, 1.21.8, 1.21.10) with architecture-specific binaries for amd64 and arm64. Uses Docker buildx with an eStargz-enabled builder for multi-platform builds and caches results to `.BASE_DOCKERFILE`.
 
 ## Architecture
 
@@ -312,7 +312,7 @@ alchemy.run.ts                # Alchemy IaC definition for workers, containers, 
   - Builds a single container image containing all three Paper versions (1.21.7, 1.21.8, 1.21.10)
   - Multi-platform support for both amd64 and arm64 architectures
   - The Dockerfile installs all Paper server JARs and version-specific Dynmap plugins during the build stage
-  - Uses Docker buildx with registry caching to minimize rebuild times
+  - Uses Docker buildx with registry caching and eStargz compression to minimize rebuild times and speed up cold starts
   - Image tag is written to `.BASE_DOCKERFILE` for Alchemy to consume
   - Runtime version selection is handled via `VERSION` environment variable
 - Container logs are accessible via `/api/logs` only when the container is running; expect errors if the container is asleep.
