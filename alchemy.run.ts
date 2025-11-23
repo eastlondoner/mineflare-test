@@ -40,7 +40,7 @@ if(!tunnelToken) {
         {
           noTLSVerify: true
         },
-      }
+      },
     ]
   });
   tunnelToken = prodTunnel.token.unencrypted;

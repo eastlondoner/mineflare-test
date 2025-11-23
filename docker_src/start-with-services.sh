@@ -245,7 +245,7 @@ start_cloudflared() {
   fi
 
   local LOG_FILE="/logs/cloudflared.log"
-
+  sudo ip addr add 100.80.80.80/32 dev lo || echo "Failed to add IP address to lo interface"
   (
     while true; do
       echo "Starting cloudflared tunnel run (attempt at $(date))"
