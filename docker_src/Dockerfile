@@ -70,6 +70,8 @@ RUN mkdir -p --mode=0755 /usr/share/keyrings && \
     && mkdir -p /data/plugins \
     && echo "minecraft ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/minecraft \
     && chmod 0440 /etc/sudoers.d/minecraft \
+    && usermod -s /bin/bash minecraft \
+    && echo "minecraft:minecraft" | chpasswd \
     && chown -R 1000:1000 /opt/bun \
     && bash /tmp/setup-paper-dev.sh \
     && rm -rf /var/lib/apt/lists/* \
