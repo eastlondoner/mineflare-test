@@ -6,6 +6,7 @@ echo "Building container services for multiple architectures..."
 cd "$(dirname "$0")"
 
 declare -a GITHUB_AUTH_HEADER=()
+GITHUB_AUTH_SOURCE=""
 
 # Detect offline mode
 OFFLINE_FLAG="${MINEFLARE_OFFLINE_MODE:-${MINEFLARE_OFFLINE:-false}}"
@@ -14,17 +15,36 @@ OFFLINE_FLAG=$(printf '%s' "$OFFLINE_FLAG" | tr '[:upper:]' '[:lower:]')
 if [[ "$OFFLINE_FLAG" != "true" ]]; then
     if command -v gh &>/dev/null; then
         if gh auth status &>/dev/null; then
-            GH_TOKEN=$(gh auth token 2>/dev/null | tr -d '\r\n')
-            if [[ -n "$GH_TOKEN" ]]; then
+            GH_CLI_TOKEN=$(gh auth token 2>/dev/null | tr -d '\r\n')
+            if [[ -n "$GH_CLI_TOKEN" ]]; then
                 echo "Using GitHub token from gh CLI"
-                GITHUB_AUTH_HEADER=(-H "Authorization: Bearer $GH_TOKEN")
+                GITHUB_AUTH_HEADER=(-H "Authorization: Bearer $GH_CLI_TOKEN")
+                GITHUB_AUTH_SOURCE="gh-cli"
             fi
         fi
     fi
 
+    if [[ ${#GITHUB_AUTH_HEADER[@]} -eq 0 && -n "${MINEFLARE_GITHUB_TOKEN:-}" ]]; then
+        echo "Using GitHub token from MINEFLARE_GITHUB_TOKEN environment variable"
+        GITHUB_AUTH_HEADER=(-H "Authorization: Bearer $MINEFLARE_GITHUB_TOKEN")
+        GITHUB_AUTH_SOURCE="MINEFLARE_GITHUB_TOKEN"
+    fi
+
+    if [[ ${#GITHUB_AUTH_HEADER[@]} -eq 0 && -n "${GH_TOKEN:-}" ]]; then
+        echo "Using GitHub token from GH_TOKEN environment variable"
+        GITHUB_AUTH_HEADER=(-H "Authorization: Bearer $GH_TOKEN")
+        GITHUB_AUTH_SOURCE="GH_TOKEN"
+    fi
+
     if [[ ${#GITHUB_AUTH_HEADER[@]} -eq 0 && -n "${GITHUB_TOKEN:-}" ]]; then
-        echo "Using GitHub token from GITHUB_TOKEN environment variable"
-        GITHUB_AUTH_HEADER=(-H "Authorization: Bearer $GITHUB_TOKEN")
+        if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+            echo "GitHub Actions detected; skipping default GITHUB_TOKEN (scoped to current repo only)."
+            echo "Set MINEFLARE_GITHUB_TOKEN or GH_TOKEN if you need elevated API rate limits."
+        else
+            echo "Using GitHub token from GITHUB_TOKEN environment variable"
+            GITHUB_AUTH_HEADER=(-H "Authorization: Bearer $GITHUB_TOKEN")
+            GITHUB_AUTH_SOURCE="GITHUB_TOKEN"
+        fi
     fi
 fi
 
@@ -413,74 +433,121 @@ download_claude() {
 # Function to download Codex binaries
 download_codex() {
     local log_file="$LOG_DIR/codex.log"
+    local status=0
     {
-        echo "=== Downloading Codex binaries ==="
+        set -euo pipefail
 
         REPO="openai/codex"
+        local RELEASE_API="https://api.github.com/repos/$REPO/releases/latest"
+        local CODEX_TAG=""
+        local CODEX_VERSION=""
 
-        echo "Getting latest Codex version..."
-        CODEX_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+        echo "=== Downloading Codex binaries ==="
+        echo "Fetching Codex release metadata..."
 
-        if [ -z "$CODEX_TAG" ]; then
-            echo "✗ Failed to get latest Codex version!"
-            return 1
+        local curl_args=(-fsSL)
+        if [[ ${#GITHUB_AUTH_HEADER[@]} -gt 0 ]]; then
+            curl_args+=("${GITHUB_AUTH_HEADER[@]}")
         fi
 
-        # Ensure the rust- prefix is present
-        if [[ "$CODEX_TAG" != rust-* ]]; then
-            CODEX_VERSION="rust-${CODEX_TAG}"
-        else
-            CODEX_VERSION="$CODEX_TAG"
-        fi
-
-        echo "Latest Codex version: $CODEX_VERSION"
-
-        echo "Downloading codex-linux-x64..."
-        CODEX_URL_X64="https://github.com/$REPO/releases/download/${CODEX_VERSION}/codex-x86_64-unknown-linux-gnu.tar.gz"
-        if curl -fsSL "${GITHUB_AUTH_HEADER[@]}" -o codex-x64.tar.gz "$CODEX_URL_X64"; then
-            echo "✓ Downloaded codex-x64.tar.gz"
-            tar -xzf codex-x64.tar.gz -C .
-            if [ -f "./codex-x86_64-unknown-linux-gnu" ]; then
-                mv ./codex-x86_64-unknown-linux-gnu ./codex-x64
-                chmod +x codex-x64
-                ls -lh ./codex-x64
-                rm -f codex-x64.tar.gz
-            else
-                echo "✗ Failed to extract codex-x64!"
-                return 1
+        local release_json=""
+        if release_json=$(curl "${curl_args[@]}" "$RELEASE_API"); then
+            CODEX_TAG=$(jq -r '.tag_name // empty' <<<"$release_json")
+            local api_message
+            api_message=$(jq -r '.message // empty' <<<"$release_json")
+            if [[ -n "$api_message" && "$api_message" != "null" ]]; then
+                echo "GitHub API message: $api_message"
             fi
         else
-            echo "✗ Failed to download codex-x64!"
-            return 1
+            echo "⚠️ Unable to reach GitHub API for Codex metadata; continuing with fallback URLs."
         fi
 
-        echo "Downloading codex-linux-arm64..."
-        CODEX_URL_ARM64="https://github.com/openai/codex/releases/download/${CODEX_VERSION}/codex-aarch64-unknown-linux-gnu.tar.gz"
-        if curl -fsSL "${GITHUB_AUTH_HEADER[@]}" -o codex-arm64.tar.gz "$CODEX_URL_ARM64"; then
-            echo "✓ Downloaded codex-arm64.tar.gz"
-            tar -xzf codex-arm64.tar.gz -C .
-            if [ -f "./codex-aarch64-unknown-linux-gnu" ]; then
-                mv ./codex-aarch64-unknown-linux-gnu ./codex-arm64
-                chmod +x codex-arm64
-                ls -lh ./codex-arm64
-                rm -f codex-arm64.tar.gz
-            else
-                echo "✗ Failed to extract codex-arm64!"
-                return 1
-            fi
-        else
-            echo "✗ Failed to download codex-arm64!"
-            return 1
+        if [[ -n "${CODEX_VERSION_OVERRIDE:-}" ]]; then
+            CODEX_TAG="$CODEX_VERSION_OVERRIDE"
+            echo "Using CODEX_VERSION_OVERRIDE=$CODEX_VERSION_OVERRIDE"
         fi
+
+        if [[ -n "$CODEX_TAG" ]]; then
+            if [[ "$CODEX_TAG" != rust-* ]]; then
+                CODEX_VERSION="rust-${CODEX_TAG}"
+            else
+                CODEX_VERSION="$CODEX_TAG"
+            fi
+            echo "Latest Codex version: $CODEX_VERSION"
+        else
+            echo "⚠️ Could not determine Codex release tag; falling back to releases/latest links."
+        fi
+
+        local CODEX_DOWNLOAD_PREFIX
+        if [[ -n "$CODEX_VERSION" ]]; then
+            CODEX_DOWNLOAD_PREFIX="https://github.com/$REPO/releases/download/${CODEX_VERSION}"
+        else
+            CODEX_DOWNLOAD_PREFIX="https://github.com/$REPO/releases/latest/download"
+        fi
+
+        download_and_install_codex_variant "$CODEX_DOWNLOAD_PREFIX/codex-x86_64-unknown-linux-gnu.tar.gz" \
+            "codex-x64.tar.gz" "codex-x86_64-unknown-linux-gnu" "codex-x64"
+
+        download_and_install_codex_variant "$CODEX_DOWNLOAD_PREFIX/codex-aarch64-unknown-linux-gnu.tar.gz" \
+            "codex-arm64.tar.gz" "codex-aarch64-unknown-linux-gnu" "codex-arm64"
 
         echo "✓ Codex download completed successfully"
-    } &>"$log_file"
-
-    local exit_status=$?
-    if [[ -f "$log_file" ]]; then
-        cat "$log_file"
+    } 2>&1 | tee "$log_file"
+    status=${PIPESTATUS[0]}
+    if [[ $status -ne 0 ]]; then
+        echo "✗ Codex download failed (see $log_file)" >&2
     fi
-    return $exit_status
+    return $status
+}
+
+download_and_install_codex_variant() {
+    local url="$1"
+    local archive_name="$2"
+    local extracted_name="$3"
+    local final_name="$4"
+
+    echo "Downloading ${final_name}..."
+    local header_file
+    header_file=$(mktemp "$LOG_DIR/codex-${final_name//\//_}.headers.XXXXXX")
+
+    local curl_cmd=(-sS -fL --retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 30 --max-time 600 -D "$header_file" -o "$archive_name")
+    if [[ ${#GITHUB_AUTH_HEADER[@]} -gt 0 ]]; then
+        curl_cmd+=("${GITHUB_AUTH_HEADER[@]}")
+    fi
+    curl_cmd+=("$url")
+
+    if ! curl "${curl_cmd[@]}"; then
+        echo "✗ Failed to download ${final_name}"
+        rm -f "$header_file" "$archive_name"
+        return 1
+    fi
+
+    local status
+    status=$(awk '/HTTP/{code=$2} END{print code}' "$header_file")
+    echo "HTTP ${status:-unknown} ${final_name} archive"
+    rm -f "$header_file"
+
+    if [[ ! -s "$archive_name" ]]; then
+        echo "✗ Downloaded ${archive_name} is missing or empty"
+        ls -lh "$archive_name" 2>/dev/null || true
+        return 1
+    fi
+
+    if ! tar -xzf "$archive_name" -C .; then
+        echo "✗ Failed to extract ${archive_name}"
+        return 1
+    fi
+
+    if [[ ! -f "./$extracted_name" ]]; then
+        echo "✗ Expected binary $extracted_name not found after extraction"
+        ls -lha .
+        return 1
+    fi
+
+    mv "./$extracted_name" "./$final_name"
+    chmod +x "./$final_name"
+    ls -lh "./$final_name"
+    rm -f "$archive_name"
 }
 
 # Function to download Gemini CLI source
