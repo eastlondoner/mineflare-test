@@ -237,6 +237,8 @@ start_cloudflared() {
     echo "Skipping cloudflared tunnel (binary not found)"
     return
   fi
+  
+  local LOG_FILE="/logs/cloudflared.log"
 
   local TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
   if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
@@ -244,11 +246,12 @@ start_cloudflared() {
     return
   fi
 
-  local LOG_FILE="/logs/cloudflared.log"
-  sudo ip addr add 100.80.80.80/32 dev lo || echo "Failed to add IP address to lo interface"
+  local WARP_DESTINATION_IP_ADDRESS="100.80.80.80"
+  sudo ip addr add "${WARP_DESTINATION_IP_ADDRESS}/32" dev lo || echo "Failed to add IP address to lo interface"
   (
     while true; do
       echo "Starting cloudflared tunnel run (attempt at $(date))"
+      # Must use --protocol http2 from inside a Cloudflare container or it will fail
       cloudflared tunnel run --protocol http2 --token "$TOKEN"
       EXIT_CODE=$?
       echo "cloudflared tunnel exited (code: $EXIT_CODE), restarting in 5 seconds..."
