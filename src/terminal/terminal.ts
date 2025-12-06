@@ -101,6 +101,25 @@ const urlBuffer: Map<TerminalType, string> = new Map();
 
 // Terminal width (set in start-with-services.sh)
 const TERMINAL_WIDTH = 160;
+const HEADER_HEIGHT = 140;
+const TERMINAL_HEIGHT_RATIO = 0.8;
+const MIN_TERMINAL_HEIGHT = 360;
+
+function updateTerminalHeightVar() {
+  const availableSpace = Math.max(window.innerHeight - HEADER_HEIGHT, 0);
+  if (availableSpace === 0) {
+    document.documentElement.style.setProperty('--terminal-height', '0px');
+    return;
+  }
+
+  const reducedHeight = availableSpace * TERMINAL_HEIGHT_RATIO;
+  const desiredHeight = availableSpace < MIN_TERMINAL_HEIGHT
+    ? availableSpace
+    : Math.max(MIN_TERMINAL_HEIGHT, reducedHeight);
+  const clampedHeight = Math.min(availableSpace, desiredHeight);
+
+  document.documentElement.style.setProperty('--terminal-height', `${Math.round(clampedHeight)}px`);
+}
 
 // URL regex - matches common URL patterns including query strings
 // Excludes: whitespace, brackets, quotes, pipes, backslashes
@@ -839,50 +858,72 @@ function setupTerminalDataHandler(type: ActualTerminalType) {
   dataHandlersSetup.add(type);
 }
 
-// Fallback: route clipboard paste to the active terminal when its helper isn't focused
-// This helps in cases where focus was lost during tab switches (e.g., Gemini flow)
+/**
+ * Single authoritative paste handler using capture phase.
+ * 
+ * Previous approach had two paths: xterm native paste (via onData) and a document fallback.
+ * This was fragile because if xterm had focus but its internal paste handling broke
+ * (browser quirks, IME states, etc.), paste would silently fail.
+ * 
+ * New approach: Always intercept paste in capture phase before xterm sees it,
+ * and send directly through WebSocket. This gives us full control and better error feedback.
+ */
 document.addEventListener('paste', (event) => {
   const activeEl = document.activeElement as HTMLElement | null;
   
-  // Don't intercept paste if xterm has focus
-  if (activeEl && activeEl.classList && activeEl.classList.contains('xterm-helper-textarea')) {
-    return; // xterm has focus; let it handle paste natively
+  // Allow paste in regular form inputs (but NOT xterm's helper textarea - we handle that)
+  if (activeEl) {
+    const isInput = activeEl.tagName === 'INPUT';
+    const isNonXtermTextarea = activeEl.tagName === 'TEXTAREA' && 
+      !activeEl.classList.contains('xterm-helper-textarea');
+    
+    if (isInput || isNonXtermTextarea) {
+      return; // Let form inputs handle their own paste
+    }
   }
 
-  // Don't intercept paste if a form input/textarea has focus (e.g., API key modal)
-  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-    return; // Let the input handle paste normally
-  }
-
-  // Don't intercept paste if modal is active
+  // Don't intercept if modal is active
   const modalOverlay = document.getElementById('modal-overlay');
   if (modalOverlay && modalOverlay.classList.contains('active')) {
-    return; // Modal is open, don't intercept
+    return;
   }
 
-  const type = currentTerminal;
-  if (type === 'browser') return;
-  const instance = terminals[type as ActualTerminalType];
-  if (!instance || !instance.ws || instance.ws.readyState !== WebSocket.OPEN) return;
+  // Browser tab doesn't need terminal paste handling
+  if (currentTerminal === 'browser') {
+    return;
+  }
 
-  const clipboardData = (event.clipboardData || (window as any).clipboardData);
+  const instance = terminals[currentTerminal as ActualTerminalType];
+  if (!instance) {
+    console.error('Paste failed: no terminal instance for', currentTerminal);
+    return;
+  }
+
+  // Get clipboard content
+  const clipboardData = event.clipboardData || (window as any).clipboardData;
   const text = clipboardData?.getData('text/plain');
   if (!text) return;
 
+  // Always prevent default and stop propagation - we're handling this exclusively
   event.preventDefault();
+  event.stopPropagation();
 
-  const encoded = textEncoder.encode(text);
-  const message = new Uint8Array(encoded.length + 1);
-  message[0] = '0'.charCodeAt(0);
-  message.set(encoded, 1);
-  instance.ws.send(message);
-});
+  // Check WebSocket state and send
+  if (instance.ws && instance.ws.readyState === WebSocket.OPEN) {
+    const encoded = textEncoder.encode(text);
+    const message = new Uint8Array(encoded.length + 1);
+    message[0] = '0'.charCodeAt(0); // INPUT command
+    message.set(encoded, 1);
+    instance.ws.send(message);
+  } else {
+    // Show feedback when paste fails due to connection issues
+    showStatus('Cannot paste: terminal not connected', 'error');
+    console.warn('Paste failed: WebSocket not open. State:', instance.ws?.readyState);
+  }
+}, true); // CAPTURE PHASE - intercept before xterm sees it
 
 // Setup data handler for Claude (initially visible)
 setupTerminalDataHandler('claude');
-
-// xterm.js handles paste events natively through its onData handler
-// No custom paste handling needed - CMD+V/Ctrl+V work out of the box
 
 // In shared PTY mode, terminal resizing is controlled by the server
 // Window resize events don't trigger terminal resizes - the container scrolls instead
@@ -979,6 +1020,9 @@ initializePanelState();
 const tabs = document.querySelectorAll('.tab');
 const terminalWrappers = document.querySelectorAll('.terminal-wrapper');
 
+updateTerminalHeightVar();
+window.addEventListener('resize', updateTerminalHeightVar);
+
 tabs.forEach(tab => {
   tab.addEventListener('click', () => {
     const terminalType = tab.getAttribute('data-terminal') as TerminalType;
@@ -1059,6 +1103,41 @@ connect('claude');
 
 // Mark browser tab as always connected (it's an iframe, not a WebSocket connection managed here)
 updateTabConnectionState('browser', 'connected');
+
+/**
+ * Focus management: Ensure terminal regains focus after UI interactions.
+ * This helps maintain consistent paste behavior.
+ */
+
+// Re-focus terminal when clicking on terminal wrapper
+terminalWrappers.forEach(wrapper => {
+  wrapper.addEventListener('click', (e) => {
+    const terminalType = wrapper.getAttribute('data-terminal') as TerminalType;
+    // Only handle clicks for terminal types (not browser)
+    if (terminalType && terminalType !== 'browser' && terminalType === currentTerminal) {
+      const instance = terminals[terminalType as ActualTerminalType];
+      if (instance) {
+        // Small delay to let any UI interaction complete first
+        requestAnimationFrame(() => {
+          instance.terminal.focus();
+        });
+      }
+    }
+  });
+});
+
+// Re-focus terminal when window regains focus (helps after alt-tabbing)
+window.addEventListener('focus', () => {
+  if (currentTerminal !== 'browser') {
+    const instance = terminals[currentTerminal as ActualTerminalType];
+    if (instance) {
+      // Delay to ensure window is fully focused
+      setTimeout(() => {
+        instance.terminal.focus();
+      }, 50);
+    }
+  }
+});
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {

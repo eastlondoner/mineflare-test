@@ -441,6 +441,7 @@ download_codex() {
         local RELEASE_API="https://api.github.com/repos/$REPO/releases/latest"
         local CODEX_TAG=""
         local CODEX_VERSION=""
+        local CODEX_DEFAULT_VERSION="0.64"
 
         echo "=== Downloading Codex binaries ==="
         echo "Fetching Codex release metadata..."
@@ -462,6 +463,11 @@ download_codex() {
             echo "⚠️ Unable to reach GitHub API for Codex metadata; continuing with fallback URLs."
         fi
 
+        if [[ -z "${CODEX_VERSION_OVERRIDE:-}" ]]; then
+            CODEX_VERSION_OVERRIDE="$CODEX_DEFAULT_VERSION"
+            echo "Defaulting Codex version to pinned release $CODEX_VERSION_OVERRIDE"
+        fi
+
         if [[ -n "${CODEX_VERSION_OVERRIDE:-}" ]]; then
             CODEX_TAG="$CODEX_VERSION_OVERRIDE"
             echo "Using CODEX_VERSION_OVERRIDE=$CODEX_VERSION_OVERRIDE"
@@ -473,7 +479,7 @@ download_codex() {
             else
                 CODEX_VERSION="$CODEX_TAG"
             fi
-            echo "Latest Codex version: $CODEX_VERSION"
+            echo "Using Codex version: $CODEX_VERSION"
         else
             echo "⚠️ Could not determine Codex release tag; falling back to releases/latest links."
         fi
