@@ -764,6 +764,11 @@
                 <span class="tab-label">Browser</span>
                 <span class="tab-status"></span>
             </div>
+            <div class="tab" data-terminal="cursor">
+                <span class="tab-icon">📝</span>
+                <span class="tab-label">Cursor</span>
+                <span class="tab-status"></span>
+            </div>
         </div>
     </div>
 
@@ -783,6 +788,32 @@
         </div>
         <div class="terminal-wrapper" data-terminal="browser">
             <iframe id="browser-iframe" class="browser-iframe" src="/src/browser"></iframe>
+        </div>
+        <div class="terminal-wrapper" data-terminal="cursor">
+            <div id="cursor-content" style="padding: 40px; color: #e0e0e0; height: 100%; overflow-y: auto;">
+                <h2 style="color: #57A64E; margin-bottom: 20px; font-size: 24px;">📝 Cursor SSH Connection</h2>
+                <div style="background: rgba(26, 46, 30, 0.4); border: 2px solid rgba(87, 166, 78, 0.3); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                    <h3 style="color: #57A64E; margin-bottom: 16px; font-size: 18px;">Requirements</h3>
+                    <ul style="line-height: 1.8; margin-left: 20px;">
+                        <li>Cloudflare WARP client installed and connected</li>
+                        <li>Cursor IDE installed</li>
+                        <li>WARP split tunnel configured to route <code style="background: rgba(87, 166, 78, 0.2); padding: 2px 6px; border-radius: 4px;">100.80.80.80</code> through Cloudflare</li>
+                    </ul>
+                </div>
+                <div style="background: rgba(26, 46, 30, 0.4); border: 2px solid rgba(87, 166, 78, 0.3); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                    <h3 style="color: #57A64E; margin-bottom: 16px; font-size: 18px;">Connection Details</h3>
+                    <div style="font-family: 'Courier New', monospace; background: rgba(10, 22, 18, 0.6); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                        <div style="margin-bottom: 8px;"><strong>Host:</strong> <span id="cursor-host">100.80.80.80</span></div>
+                        <div style="margin-bottom: 8px;"><strong>User:</strong> minecraft</div>
+                        <div style="margin-bottom: 8px;"><strong>Path:</strong> /data</div>
+                        <div><strong>Deep Link:</strong> <span id="cursor-deep-link" style="color: #57A64E; word-break: break-all;">Loading...</span></div>
+                    </div>
+                </div>
+                <button id="cursor-launch-btn" style="background: linear-gradient(135deg, rgba(87, 166, 78, 0.15), rgba(87, 166, 78, 0.25)); border: 2px solid rgba(87, 166, 78, 0.3); color: #57A64E; padding: 16px 32px; font-size: 16px; font-weight: 700; border-radius: 12px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 100%;">
+                    🚀 Open in Cursor
+                </button>
+                <div id="cursor-status" style="margin-top: 16px; padding: 12px; border-radius: 8px; display: none;"></div>
+            </div>
         </div>
     </div>
 

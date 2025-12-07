@@ -1,6 +1,6 @@
 import alchemy, { type Scope } from "alchemy";
 import { CloudflareStateStore, SQLiteStateStore } from "alchemy/state";
-import { DurableObjectNamespace, Container, R2Bucket, BunSPA, Worker, Secret, Tunnel } from "alchemy/cloudflare";
+import { DurableObjectNamespace, Container, R2Bucket, BunSPA, Worker, Secret, Tunnel, WarpDefaultProfile, TunnelRoute } from "alchemy/cloudflare";
 import { MinecraftContainer } from "./src/container.ts";
 
 // We maximize concurrency in this file to ensure that build and depoy are as fast as possible.
@@ -21,10 +21,12 @@ const app = await alchemy(name, {
   stage: name,
 });
 
+
 const baseDockerfile = await Bun.file("docker_src/.BASE_DOCKERFILE").text();
 
 console.log(`Base Dockerfile: ${baseDockerfile}`);
 
+let containerIp = "100.80.80.80";
 let tunnelToken = process.env.CLOUDFLARE_TUNNEL_TOKEN ?? "";
 if(!tunnelToken) {
   const prodTunnel = await Tunnel("mineflare-prod-tunnel", {
@@ -43,8 +45,25 @@ if(!tunnelToken) {
       },
     ]
   });
+  const tunnelRoute = await TunnelRoute("mineflare-tunnel-route", {
+    network: `${containerIp}/32`,
+    tunnel: prodTunnel,
+    adopt: true,
+    comment: "Tunnel route for mineflare",
+  });
+  const warpDefaultProfile = await WarpDefaultProfile("mineflare-warp-default-profile", {
+    allowedToLeave: true,
+    splitTunnel: {
+      mode: "include",
+      entries: [{
+        address: tunnelRoute.network,
+      }],
+    },
+  });
+
   tunnelToken = prodTunnel.token.unencrypted;
 }
+
 
 export const containerPromise = Container<MinecraftContainer>("container3", {
   name: `${app.name}-container`,

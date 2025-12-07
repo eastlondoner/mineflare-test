@@ -71,7 +71,9 @@ RUN mkdir -p --mode=0755 /usr/share/keyrings && \
     && echo "minecraft ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/minecraft \
     && chmod 0440 /etc/sudoers.d/minecraft \
     && usermod -s /bin/bash minecraft \
-    && echo "minecraft:minecraft" | chpasswd \
+    && passwd -d minecraft \
+    && mkdir -p /etc/ssh/sshd_config.d \
+    && printf '# Only listen on localhost - cloudflared proxies tunnel traffic here\nListenAddress 127.0.0.1\nListenAddress ::1\n\n# Allow empty passwords (only reachable via localhost now)\nPermitEmptyPasswords yes\nPasswordAuthentication yes\n' > /etc/ssh/sshd_config.d/mineflare.conf \
     && chown -R 1000:1000 /opt/bun \
     && bash /tmp/setup-paper-dev.sh \
     && rm -rf /var/lib/apt/lists/* \

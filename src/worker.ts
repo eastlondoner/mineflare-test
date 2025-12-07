@@ -209,6 +209,15 @@ const elysiaApp = (
   })
 
   /**
+   * Get the Cursor SSH deep link URL
+   */
+  .get("/cursor-url", () => {
+    const containerIp = "100.80.80.80";
+    const cursorUrl = `cursor://vscode-remote/ssh-remote+minecraft@${containerIp}/data`;
+    return { url: cursorUrl };
+  })
+
+  /**
    * Get the state of the container ("running" | "stopping" | "stopped" | "healthy" | "stopped_with_code"). This does not wake the container.
    */
   .get("/getState", async ({ request }) => {

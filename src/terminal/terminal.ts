@@ -30,7 +30,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
  *   - All clients share a single PTY process
  */
 
-type TerminalType = 'claude' | 'codex' | 'gemini' | 'bash' | 'browser';
+type TerminalType = 'claude' | 'codex' | 'gemini' | 'bash' | 'browser' | 'cursor';
 type ActualTerminalType = 'claude' | 'codex' | 'gemini' | 'bash';
 
 interface TerminalInstance {
@@ -288,7 +288,8 @@ function updateUrlPanel() {
                         currentTerminal === 'codex' ? 'Codex' : 
                         currentTerminal === 'gemini' ? 'Gemini' : 
                         currentTerminal === 'bash' ? 'Bash' :
-                        currentTerminal === 'browser' ? 'Browser' : currentTerminal;
+                        currentTerminal === 'browser' ? 'Browser' :
+                        currentTerminal === 'cursor' ? 'Cursor' : currentTerminal;
     panel.innerHTML = `<div class="no-urls">No URLs detected in ${terminalName} terminal.<br>URLs will appear here as they are output.</div>`;
     return;
   }
@@ -888,8 +889,8 @@ document.addEventListener('paste', (event) => {
     return;
   }
 
-  // Browser tab doesn't need terminal paste handling
-  if (currentTerminal === 'browser') {
+  // Browser and Cursor tabs don't need terminal paste handling
+  if (currentTerminal === 'browser' || currentTerminal === 'cursor') {
     return;
   }
 
@@ -932,7 +933,7 @@ setupTerminalDataHandler('claude');
 const refreshUrlsBtn = document.getElementById('refresh-urls-btn');
 if (refreshUrlsBtn) {
   refreshUrlsBtn.addEventListener('click', () => {
-    if (currentTerminal !== 'browser') {
+    if (currentTerminal !== 'browser' && currentTerminal !== 'cursor') {
       console.log(`Scanning ${currentTerminal} terminal for URLs...`);
       scanTerminalForUrls(currentTerminal as ActualTerminalType);
       showStatus(`Scanned ${currentTerminal} terminal`, 'connected');
@@ -1060,10 +1061,17 @@ function doSwitchTerminal(type: TerminalType) {
   // Update URL panel to show URLs from new terminal
   updateUrlPanel();
 
-  // Browser tab doesn't need terminal setup
+  // Browser and Cursor tabs don't need terminal setup
   if (type === 'browser') {
     updateTabConnectionState(type, 'connected');
     showStatus('Browser ready', 'connected');
+    return;
+  }
+
+  if (type === 'cursor') {
+    updateTabConnectionState(type, 'connected');
+    showStatus('Cursor ready', 'connected');
+    loadCursorUrl();
     return;
   }
 
@@ -1101,8 +1109,95 @@ terminals.claude.terminal.focus();
 // Start connection to the current (claude) terminal
 connect('claude');
 
-// Mark browser tab as always connected (it's an iframe, not a WebSocket connection managed here)
+// Mark browser and cursor tabs as always connected (they're not WebSocket connections managed here)
 updateTabConnectionState('browser', 'connected');
+updateTabConnectionState('cursor', 'connected');
+
+/**
+ * Load Cursor deep link URL from API
+ */
+async function loadCursorUrl() {
+  try {
+    const response = await fetchApi('/api/cursor-url');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch cursor URL: ${response.statusText}`);
+    }
+    const data = await response.json() as { url: string };
+    const deepLinkEl = document.getElementById('cursor-deep-link');
+    if (deepLinkEl) {
+      deepLinkEl.textContent = data.url;
+    }
+  } catch (error) {
+    console.error('Failed to load cursor URL:', error);
+    const deepLinkEl = document.getElementById('cursor-deep-link');
+    if (deepLinkEl) {
+      deepLinkEl.textContent = 'Failed to load';
+      deepLinkEl.style.color = '#ff6b6b';
+    }
+  }
+}
+
+/**
+ * Launch Cursor with SSH deep link
+ */
+async function launchCursor() {
+  try {
+    const response = await fetchApi('/api/cursor-url');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch cursor URL: ${response.statusText}`);
+    }
+    const data = await response.json() as { url: string };
+    
+    // Open the deep link
+    window.location.href = data.url;
+    
+    // Show status message
+    const statusEl = document.getElementById('cursor-status');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.background = 'rgba(87, 166, 78, 0.15)';
+      statusEl.style.border = '2px solid rgba(87, 166, 78, 0.3)';
+      statusEl.style.color = '#57A64E';
+      statusEl.textContent = 'Opening Cursor... If it doesn\'t open, make sure Cursor is installed and WARP is connected.';
+    }
+  } catch (error) {
+    console.error('Failed to launch Cursor:', error);
+    const statusEl = document.getElementById('cursor-status');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.background = 'rgba(255, 107, 107, 0.15)';
+      statusEl.style.border = '2px solid rgba(255, 107, 107, 0.3)';
+      statusEl.style.color = '#ff6b6b';
+      statusEl.textContent = `Failed to launch Cursor: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+}
+
+// Set up Cursor launch button handler
+const cursorLaunchBtn = document.getElementById('cursor-launch-btn');
+if (cursorLaunchBtn) {
+  cursorLaunchBtn.addEventListener('click', launchCursor);
+  
+  // Add hover effects
+  cursorLaunchBtn.addEventListener('mouseenter', () => {
+    cursorLaunchBtn.style.background = 'linear-gradient(135deg, rgba(87, 166, 78, 0.25), rgba(87, 166, 78, 0.35))';
+    cursorLaunchBtn.style.borderColor = 'rgba(87, 166, 78, 0.6)';
+    cursorLaunchBtn.style.transform = 'translateY(-2px)';
+    cursorLaunchBtn.style.boxShadow = '0 4px 16px rgba(87, 166, 78, 0.4)';
+  });
+  
+  cursorLaunchBtn.addEventListener('mouseleave', () => {
+    cursorLaunchBtn.style.background = 'linear-gradient(135deg, rgba(87, 166, 78, 0.15), rgba(87, 166, 78, 0.25))';
+    cursorLaunchBtn.style.borderColor = 'rgba(87, 166, 78, 0.3)';
+    cursorLaunchBtn.style.transform = 'translateY(0)';
+    cursorLaunchBtn.style.boxShadow = 'none';
+  });
+}
+
+// Load cursor URL when page loads (if cursor tab is visible)
+if (currentTerminal === 'cursor') {
+  loadCursorUrl();
+}
 
 /**
  * Focus management: Ensure terminal regains focus after UI interactions.
@@ -1113,8 +1208,8 @@ updateTabConnectionState('browser', 'connected');
 terminalWrappers.forEach(wrapper => {
   wrapper.addEventListener('click', (e) => {
     const terminalType = wrapper.getAttribute('data-terminal') as TerminalType;
-    // Only handle clicks for terminal types (not browser)
-    if (terminalType && terminalType !== 'browser' && terminalType === currentTerminal) {
+    // Only handle clicks for terminal types (not browser or cursor)
+    if (terminalType && terminalType !== 'browser' && terminalType !== 'cursor' && terminalType === currentTerminal) {
       const instance = terminals[terminalType as ActualTerminalType];
       if (instance) {
         // Small delay to let any UI interaction complete first
@@ -1128,7 +1223,7 @@ terminalWrappers.forEach(wrapper => {
 
 // Re-focus terminal when window regains focus (helps after alt-tabbing)
 window.addEventListener('focus', () => {
-  if (currentTerminal !== 'browser') {
+  if (currentTerminal !== 'browser' && currentTerminal !== 'cursor') {
     const instance = terminals[currentTerminal as ActualTerminalType];
     if (instance) {
       // Delay to ensure window is fully focused

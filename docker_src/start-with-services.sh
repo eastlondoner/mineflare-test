@@ -218,6 +218,9 @@ start_sshd() {
   local LOG_FILE="/logs/sshd.log"
   sudo mkdir -p /var/run/sshd
   sudo chmod 755 /var/run/sshd
+  
+  # Generate SSH host keys if they don't exist
+  sudo ssh-keygen -A
 
   (
     while true; do
