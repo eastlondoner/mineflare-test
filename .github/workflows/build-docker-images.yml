@@ -59,6 +59,8 @@ jobs:
         run: bun run build
         env:
           CI: ''
+          # Provide GitHub token for elevated API rate limits (5000/hour vs 60/hour)
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The build script will push images to DockerHub
           SKIP_PUSH: 'false'
           # Build for both amd64 and arm64
