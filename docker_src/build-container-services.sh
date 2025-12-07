@@ -441,7 +441,7 @@ download_codex() {
         local RELEASE_API="https://api.github.com/repos/$REPO/releases/latest"
         local CODEX_TAG=""
         local CODEX_VERSION=""
-        local CODEX_DEFAULT_VERSION="0.64"
+        local CODEX_DEFAULT_VERSION="v0.65.0"
 
         echo "=== Downloading Codex binaries ==="
         echo "Fetching Codex release metadata..."
