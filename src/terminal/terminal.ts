@@ -1194,10 +1194,8 @@ if (cursorLaunchBtn) {
   });
 }
 
-// Load cursor URL when page loads (if cursor tab is visible)
-if (currentTerminal === 'cursor') {
-  loadCursorUrl();
-}
+// Note: Cursor URL is loaded dynamically when switching to the cursor tab
+// via doSwitchTerminal(), not on page load (since default tab is 'claude')
 
 /**
  * Focus management: Ensure terminal regains focus after UI interactions.
