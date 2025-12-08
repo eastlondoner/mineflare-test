@@ -109,6 +109,7 @@ jobs:
             docker_src/.BASE_DOCKERFILE
           if-no-files-found: warn
           retention-days: 7
+          include-hidden-files: true
 
       - name: Summary
         if: success()
