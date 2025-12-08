@@ -44,6 +44,9 @@ if [[ -f /etc/profile.d/java21.sh ]]; then
   source /etc/profile.d/java21.sh
 fi
 
+# Remove minecraft users password
+sudo passwd -d minecraft || echo "Failed to remove minecraft users password"
+
 # Create status directory and set permissions
 sudo mkdir -p /status
 sudo chown 1000:1000 /status
