@@ -201,6 +201,9 @@ const bindings =  {
   DYNMAP_WORKER_URL: dynmapWorker.url ?? "",
 
   CLOUDFLARE_TUNNEL_TOKEN: tunnelToken,
+  
+  // WARP destination IP for tunnel routing (used by sshd and cloudflared in container)
+  WARP_DESTINATION_IP: containerIp,
 } as const;
 
 export const worker: BunSPA<typeof bindings> = await BunSPA("mineflare-main-worker", {

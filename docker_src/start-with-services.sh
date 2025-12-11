@@ -225,6 +225,15 @@ start_sshd() {
   # Generate SSH host keys if they don't exist
   sudo ssh-keygen -A
 
+  # Update sshd config to listen on WARP tunnel IP if configured
+  # The Dockerfile only configures localhost (127.0.0.1, ::1), we need to add the tunnel IP
+  local WARP_IP="${WARP_DESTINATION_IP:-100.80.80.80}"
+  if [ -n "$WARP_IP" ] && [ "$WARP_IP" != "null" ]; then
+    echo "Configuring sshd to also listen on WARP tunnel IP: $WARP_IP"
+    # Append the WARP IP to the existing sshd config
+    echo "ListenAddress $WARP_IP" | sudo tee -a /etc/ssh/sshd_config.d/mineflare.conf > /dev/null
+  fi
+
   (
     while true; do
       echo "Starting sshd (attempt at $(date))"
@@ -252,7 +261,14 @@ start_cloudflared() {
     return
   fi
 
-  local WARP_DESTINATION_IP_ADDRESS="100.80.80.80"
+  # Enable ICMP proxy for cloudflared by allowing group 1000 to send ICMP packets
+  # This fixes: "ICMP Proxy disabled - Group ID 1000 is not in the allowed ping group range"
+  echo "Enabling ICMP for cloudflared (setting ping_group_range to include group 1000)..."
+  sudo sysctl -w net.ipv4.ping_group_range="0 2147483647" || echo "Warning: Failed to set ping_group_range (ICMP proxy may be disabled)"
+
+  # Use WARP_DESTINATION_IP from environment (set by alchemy.run.ts) or default
+  local WARP_DESTINATION_IP_ADDRESS="${WARP_DESTINATION_IP:-100.80.80.80}"
+  echo "WARP destination IP: $WARP_DESTINATION_IP_ADDRESS"
   sudo ip addr add "${WARP_DESTINATION_IP_ADDRESS}/32" dev lo || echo "Failed to add IP address to lo interface"
   (
     while true; do
