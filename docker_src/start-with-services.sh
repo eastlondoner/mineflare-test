@@ -801,25 +801,25 @@ close_hteetp_fifo_guard() {
 handle_shutdown() {
   echo "Received SIGTERM, initiating graceful shutdown..."
   
-  # Forward SIGTERM to the main process (Minecraft server)
-  if [ -n "${MAIN_PID:-}" ]; then
-    echo "Sending SIGTERM to main process (PID: $MAIN_PID)..."
-    kill -TERM "$MAIN_PID" 2>/dev/null || true
+  # Forward SIGTERM to the Minecraft restart loop (which runs the server)
+  if [ -n "${MINECRAFT_PID:-}" ]; then
+    echo "Sending SIGTERM to Minecraft restart loop (PID: $MINECRAFT_PID)..."
+    kill -TERM "$MINECRAFT_PID" 2>/dev/null || true
     
-    # Wait for main process to exit gracefully (with timeout)
-    echo "Waiting for main process to exit gracefully..."
+    # Wait for Minecraft process to exit gracefully (with timeout)
+    echo "Waiting for Minecraft server to exit gracefully..."
     for i in $(seq 1 60); do
-      if ! kill -0 "$MAIN_PID" 2>/dev/null; then
-        echo "Main process exited gracefully"
+      if ! kill -0 "$MINECRAFT_PID" 2>/dev/null; then
+        echo "Minecraft server exited gracefully"
         break
       fi
       sleep 1
     done
     
     # Force kill if still running after timeout
-    if kill -0 "$MAIN_PID" 2>/dev/null; then
-      echo "Main process did not exit in time, forcing shutdown..."
-      kill -KILL "$MAIN_PID" 2>/dev/null || true
+    if kill -0 "$MINECRAFT_PID" 2>/dev/null; then
+      echo "Minecraft server did not exit in time, forcing shutdown..."
+      kill -KILL "$MINECRAFT_PID" 2>/dev/null || true
     fi
   fi
   
@@ -1118,6 +1118,24 @@ exec {HTEETP_FIFO_GUARD_FD}<>"$HTEETP_FIFO"
 ) >> /logs/hteetp.log 2>&1 &
 HTEETP_PID=$!
 echo "hteetp log server started in background (PID: $HTEETP_PID), logging to /logs/hteetp.log"
+
+# Wait for hteetp to be ready before starting Minecraft
+# This ensures hteetp has opened the FIFO for reading before tee writes to it,
+# preventing potential blocking if the pipe buffer fills before hteetp starts
+echo "Waiting for hteetp to be ready on port 8082..."
+HTEETP_WAIT_TIMEOUT=10
+HTEETP_WAIT_COUNT=0
+while ! (echo > /dev/tcp/127.0.0.1/8082) 2>/dev/null; do
+  HTEETP_WAIT_COUNT=$((HTEETP_WAIT_COUNT + 1))
+  if [ "$HTEETP_WAIT_COUNT" -ge "$HTEETP_WAIT_TIMEOUT" ]; then
+    echo "WARNING: hteetp not ready after ${HTEETP_WAIT_TIMEOUT}s, proceeding anyway (guard FD should prevent deadlock)"
+    break
+  fi
+  sleep 1
+done
+if [ "$HTEETP_WAIT_COUNT" -lt "$HTEETP_WAIT_TIMEOUT" ]; then
+  echo "hteetp is ready on port 8082"
+fi
 
 # Execute Minecraft in restart loop (background)
 # This loop runs independently of hteetp, preventing pipe failures from killing it
