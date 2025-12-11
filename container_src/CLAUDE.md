@@ -124,32 +124,34 @@ The mineflare bot server starts in **two phases**:
 ```bash
 # Start the server (in /data/mineflare-cli directory)
 cd /data/mineflare-cli
-bun start > /tmp/mineflare.log 2>&1 &
+bun mineflare server start > /tmp/mineflare.log 2>&1 &
 
 # Wait for bot to connect (REQUIRED - do not skip this)
 sleep 10
 
 # Verify bot is connected before running commands
-bun run mineflare health
+bun mineflare health
 # Should show: "botConnected": true
 
 # If botConnected is false, wait longer and check again
-sleep 5 && bun run mineflare health
+sleep 5 && bun mineflare health
+
+# Now safe to run bot commands, run help to see available commands
+bun mineflare help
 ```
 
 **Checking Connection Status**:
 
 ```bash
 # Method 1: Check health endpoint
-bun run mineflare health
+bun mineflare health
 # Look for: "botConnected": true
 
 # Method 2: Check server logs for spawn event
 tail -20 /tmp/mineflare.log | grep "Bot spawned"
 
 # Method 3: Check events
-bun run mineflare events --since 0
-# Should show a "spawn" event if connected
+bun mineflare events
 ```
 
 **Common Issues**:
@@ -157,28 +159,4 @@ bun run mineflare events --since 0
 - "botConnected: false" - Connection in progress, wait 5-10 more seconds
 - Port 3000 already in use - Clean up old process: `pkill -f "bun.*server.js"`
 
-**Proper Startup Sequence**:
-
-```bash
-# 1. Navigate to directory
-cd /data/mineflare-cli
-
-# 2. Clean up any old processes
-pkill -f "bun.*server.js" 2>/dev/null || true
-
-# 3. Start server with logging
-bun start > /tmp/mineflare.log 2>&1 &
-
-# 4. Wait for connection (REQUIRED)
-sleep 10
-
-# 5. Verify connection
-bun run mineflare health
-
-# 6. Check bot state
-bun run mineflare state
-
-# Now safe to run bot commands
-```
-
-**Running Bot Commands**: Only run bot commands (move, dig, state, inventory, etc.) after confirming `botConnected: true`. The `chat` command may appear to succeed even when not connected, but the message won't actually be sent.
+**Running Bot Commands**: Only run bot commands (including chat) after confirming `botConnected: true`.
