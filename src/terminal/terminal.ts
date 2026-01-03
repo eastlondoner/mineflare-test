@@ -1240,3 +1240,71 @@ window.addEventListener('beforeunload', () => {
     }
   });
 });
+
+/**
+ * Mobile paste button handler
+ * Uses Clipboard API to read clipboard and send to terminal
+ */
+const mobilePasteBtn = document.getElementById('mobile-paste-btn');
+if (mobilePasteBtn) {
+  mobilePasteBtn.addEventListener('click', async () => {
+    // Don't handle paste for browser or cursor tabs
+    if (currentTerminal === 'browser' || currentTerminal === 'cursor') {
+      return;
+    }
+
+    const instance = terminals[currentTerminal as ActualTerminalType];
+    if (!instance) {
+      console.error('Mobile paste: no terminal instance for', currentTerminal);
+      return;
+    }
+
+    try {
+      // Use Clipboard API to read text
+      const text = await navigator.clipboard.readText();
+
+      if (!text) {
+        // Empty clipboard - brief visual feedback
+        mobilePasteBtn.classList.add('error');
+        setTimeout(() => mobilePasteBtn.classList.remove('error'), 500);
+        return;
+      }
+
+      // Check WebSocket state and send
+      if (instance.ws && instance.ws.readyState === WebSocket.OPEN) {
+        const encoded = textEncoder.encode(text);
+        const message = new Uint8Array(encoded.length + 1);
+        message[0] = '0'.charCodeAt(0); // INPUT command
+        message.set(encoded, 1);
+        instance.ws.send(message);
+
+        // Success feedback
+        mobilePasteBtn.textContent = '✓';
+        mobilePasteBtn.classList.add('success');
+        setTimeout(() => {
+          mobilePasteBtn.textContent = '📋';
+          mobilePasteBtn.classList.remove('success');
+        }, 1000);
+      } else {
+        // Connection issue feedback
+        mobilePasteBtn.classList.add('error');
+        showStatus('Cannot paste: terminal not connected', 'error');
+        setTimeout(() => mobilePasteBtn.classList.remove('error'), 1000);
+      }
+    } catch (err) {
+      console.error('Mobile paste failed:', err);
+
+      // Permission denied or other error - show feedback
+      mobilePasteBtn.classList.add('error');
+
+      // Check if it's a permission error
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        showStatus('Clipboard access denied. Please allow clipboard permissions.', 'error');
+      } else {
+        showStatus('Failed to read clipboard', 'error');
+      }
+
+      setTimeout(() => mobilePasteBtn.classList.remove('error'), 1000);
+    }
+  });
+}
